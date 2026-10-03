@@ -1,0 +1,69 @@
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { loginUser } from "../auth";
+
+export default function Login() {
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ studentId: "", password: "" });
+  const [error, setError] = useState("");
+
+  const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const onSubmit = (e) => {
+    e.preventDefault();
+    try {
+      loginUser(form);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <form className="auth-form" onSubmit={onSubmit}>
+      <h2>Log in</h2>
+      <p className="login-copy">
+        Enter your details to mark and view attendance.
+      </p>
+
+      {error && (
+        <div className="error" role="alert">
+          {error}
+        </div>
+      )}
+
+      <div className="input-group">
+        <label htmlFor="studentId">Student number / ID</label>
+        <input
+          id="studentId"
+          name="studentId"
+          autoComplete="username"
+          required
+          value={form.studentId}
+          onChange={onChange}
+        />
+      </div>
+
+      <div className="input-group">
+        <label htmlFor="password">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={form.password}
+          onChange={onChange}
+        />
+      </div>
+
+      <button type="submit" className="sign-in-button">
+        Log in
+      </button>
+
+      <p className="switch">
+        Not registered yet? <Link to="/register">Register here</Link>
+      </p>
+    </form>
+  );
+}
