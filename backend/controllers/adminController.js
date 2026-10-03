@@ -1,4 +1,30 @@
 const supabase = require('../config/supabaseClient');
+const jwt = require('jsonwebtoken');
+
+const adminLogin = async (req, res) => {
+    try {
+        const { password } = req.body;
+
+        if (password != process.env.ADMIN_PASSWORD) {
+            return res.status(401).json({ error: "Invalid admin password." });
+        }
+
+        const { token } = jwt.sign(
+            { role: 'admin' },
+            process.env.JWT_SECRET,
+            { expiresIn: '8h' }
+        );
+
+        res.json({
+            message: "Login successful.",
+            token: token
+        });
+    }
+    catch (err) {
+        console.error("Login Error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
 
 const startSession = async (req, res) => {
     try {
@@ -81,4 +107,4 @@ const getAttendance = async (req, res) => {
     }
 };
 
-module.exports = { startSession, endSession, rotateToken, getAttendance };
+module.exports = { adminLogin, startSession, endSession, rotateToken, getAttendance };

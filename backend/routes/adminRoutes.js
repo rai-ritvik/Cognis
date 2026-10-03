@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { startSession, endSession, rotateToken, getAttendance } = require('../controllers/adminController');
+const { adminLogin, startSession, endSession, rotateToken, getAttendance } = require('../controllers/adminController');
 
+router.post('/login', adminLogin);
 router.post('/start', startSession);
 router.post('/end', endSession);
 router.post('/rotate', rotateToken);
