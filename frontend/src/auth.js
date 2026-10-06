@@ -3,19 +3,20 @@ const USERS_KEY = "sa_users";
 const SESSION_KEY = "sa_session";
 
 const getUsers = () => JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
+const normalizeStudentId = (studentId) => studentId.trim().toLowerCase();
 
 export function registerUser({ name, studentId, email, password }) {
   const users = getUsers();
-  const normalizedStudentId = studentId.trim().toLowerCase();
+  const normalizedStudentId = normalizeStudentId(studentId);
   if (!normalizedStudentId) {
     throw new Error("Enter your student number.");
   }
-  if (users.some((u) => u.studentId?.toLowerCase() === normalizedStudentId)) {
+  if (users.some((u) => u.studentId && normalizeStudentId(u.studentId) === normalizedStudentId)) {
     throw new Error("This student number is already registered. Please log in.");
   }
 
-  const normalizedEmail = email.toLowerCase();
-  const existingUser = users.find((u) => u.email === normalizedEmail);
+  const normalizedEmail = email.trim().toLowerCase();
+  const existingUser = users.find((u) => u.email?.trim().toLowerCase() === normalizedEmail);
   if (existingUser && !existingUser.studentId) {
     if (existingUser.password !== password) {
       throw new Error("Enter your current password to add your student number.");
@@ -42,9 +43,12 @@ export function registerUser({ name, studentId, email, password }) {
 }
 
 export function loginUser({ studentId, password }) {
-  const normalizedStudentId = studentId.trim().toLowerCase();
+  const loginIdentifier = studentId.trim().toLowerCase();
   const user = getUsers().find(
-    (u) => u.studentId?.toLowerCase() === normalizedStudentId && u.password === password
+    (u) => (
+      (u.studentId && normalizeStudentId(u.studentId) === loginIdentifier) ||
+      u.email?.trim().toLowerCase() === loginIdentifier
+    ) && u.password === password
   );
   if (!user) throw new Error("Incorrect student number or password.");
   localStorage.setItem(SESSION_KEY, JSON.stringify({ name: user.name, studentId: user.studentId, email: user.email }));

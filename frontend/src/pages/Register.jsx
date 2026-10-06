@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { afterButtonAnimation } from "../ButtonAnimation";
 import { registerUser } from "../auth";
 
 export default function Register() {
@@ -23,7 +24,7 @@ export default function Register() {
       return setError("Passwords do not match.");
     try {
       registerUser(form);
-      navigate("/dashboard"); // straight to dashboard after successful registration
+      afterButtonAnimation(() => navigate("/dashboard"));
     } catch (err) {
       setError(err.message);
     }
@@ -103,7 +104,7 @@ export default function Register() {
         />
       </div>
 
-      <button type="submit" className="sign-in-button">
+      <button type="submit" className="sign-in-button" data-button-animation>
         Register
       </button>
 

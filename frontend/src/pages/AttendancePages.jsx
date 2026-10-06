@@ -1,15 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  FiAlertTriangle,
+  FiCalendar,
   FiCamera,
+  FiClock,
   FiBriefcase,
   FiEdit2,
   FiFlag,
   FiGithub,
+  FiInfo,
   FiLink,
   FiShield,
   FiUser,
   FiUsers,
 } from "react-icons/fi";
+import AttendanceWelcome from "../AttendanceWelcome";
 import { getSession } from "../auth";
 import { MOCK_ATTENDANCE, MOCK_SUMMARY, fmtShort } from "./Dashboard";
 import "./Dashboard.css";
@@ -18,6 +23,55 @@ export function MarkAttendancePage() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [cameraState, setCameraState] = useState("idle");
+  const [cameraError, setCameraError] = useState("");
+  const [networkIssue, setNetworkIssue] = useState("");
+  const [errorAnimationDone, setErrorAnimationDone] = useState(false);
+
+  useEffect(() => {
+    const connection = navigator.connection;
+    const updateNetworkIssue = () => {
+      if (!navigator.onLine) {
+        setNetworkIssue("Your browser reports that this device is offline. Reconnect to Wi-Fi or mobile data and try again.");
+        return;
+      }
+
+      if (
+        connection &&
+        (connection.effectiveType === "slow-2g" ||
+          connection.effectiveType === "2g" ||
+          connection.rtt >= 2_000)
+      ) {
+        setNetworkIssue("Your browser reports a very slow network connection. Some online features may take longer or fail.");
+        return;
+      }
+
+      setNetworkIssue("");
+    };
+
+    updateNetworkIssue();
+    window.addEventListener("online", updateNetworkIssue);
+    window.addEventListener("offline", updateNetworkIssue);
+    connection?.addEventListener("change", updateNetworkIssue);
+    return () => {
+      window.removeEventListener("online", updateNetworkIssue);
+      window.removeEventListener("offline", updateNetworkIssue);
+      connection?.removeEventListener("change", updateNetworkIssue);
+    };
+  }, []);
+
+  const issueMessage = cameraError || networkIssue;
+  const issueTitle = cameraError
+    ? "Camera could not start"
+    : networkIssue
+      ? navigator.onLine ? "Connection may be slow" : "Device appears offline"
+      : "";
+  const revealIssueDetails = useCallback(() => {
+    setErrorAnimationDone(true);
+  }, []);
+
+  useEffect(() => {
+    setErrorAnimationDone(false);
+  }, [issueMessage]);
 
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -26,16 +80,33 @@ export function MarkAttendancePage() {
   const startCamera = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraState("unsupported");
+      setCameraError(
+        window.isSecureContext
+          ? "Camera access is not supported in this browser."
+          : "Camera access requires a secure connection. Open this site using HTTPS or localhost.",
+      );
       return;
     }
+    setCameraError("");
     setCameraState("loading");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       streamRef.current = stream;
       videoRef.current.srcObject = stream;
       setCameraState("ready");
-    } catch {
+    } catch (error) {
       setCameraState("denied");
+      if (error.name === "NotAllowedError" || error.name === "SecurityError") {
+        setCameraError(
+          "Camera permission was blocked. Allow camera access for this site in your browser's address-bar or site settings, then try again.",
+        );
+      } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+        setCameraError("No camera was found. Connect a camera and try again.");
+      } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+        setCameraError("The camera is busy or unavailable. Close other apps using it and try again.");
+      } else {
+        setCameraError(`Could not start the camera${error.message ? `: ${error.message}` : "."}`);
+      }
     }
   };
 
@@ -43,47 +114,83 @@ export function MarkAttendancePage() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraError("");
     setCameraState("idle");
   };
 
   return (
-    <div className="dash-page-view subpage-view">
-      <PageHeading eyebrow="TODAY" title="Mark attendance" copy="Check your camera before your session begins." />
-      <section className="mark-attendance-layout">
+    <div className="mark-attendance-page">
+      <div className="attendance-copy-block">
+        <h1>Mark Your Attendance</h1>
+        <p>Position your face in the frame and click on start scanning</p>
+      </div>
+
+      <div className="mark-attendance-layout">
         <div className="camera-panel">
           <div className={`camera-preview${cameraState === "ready" ? " live" : ""}`}>
             <video ref={videoRef} autoPlay muted playsInline aria-label="Live camera preview" hidden={cameraState !== "ready"} />
             {cameraState !== "ready" && (
               <div className="camera-placeholder">
-                <FiCamera size={36} aria-hidden="true" />
-                <strong>{cameraState === "denied" ? "Camera access blocked" : "Camera preview"}</strong>
-                <span>{cameraState === "unsupported" ? "Camera access is not supported in this browser." : "Your camera stays off until you start the check."}</span>
+                <span className="camera-placeholder-text">selfie Camera view</span>
               </div>
             )}
           </div>
-          <div className="camera-actions">
-            <div>
-              <strong>{cameraState === "ready" ? "Camera connected" : "Camera check"}</strong>
-              <p>Preview only. Face recognition and attendance submission are not connected yet.</p>
+
+          <button className="action-button" type="button" onClick={startCamera} disabled={cameraState === "loading" || cameraState === "unsupported"}>
+            <FiCamera size={16} aria-hidden="true" />
+            {cameraState === "loading" ? "Connecting…" : "Start Scanning"}
+          </button>
+
+          <div className="camera-meta-row">
+            <div className="meta-item">
+              <div className="meta-icon"><FiCalendar size={16} aria-hidden="true" /></div>
+              <div className="meta-copy">
+                <span>Date</span>
+                <strong>Tue, 30 Sep 2025</strong>
+              </div>
             </div>
-            {cameraState === "ready" ? (
-              <button className="action-button secondary" type="button" onClick={stopCamera}>Stop camera</button>
-            ) : (
-              <button className="action-button" type="button" onClick={startCamera} disabled={cameraState === "loading" || cameraState === "unsupported"}>
-                {cameraState === "loading" ? "Connecting…" : "Start camera"}
-              </button>
-            )}
+            <div className="meta-divider" aria-hidden="true" />
+            <div className="meta-item">
+              <div className="meta-icon"><FiClock size={16} aria-hidden="true" /></div>
+              <div className="meta-copy">
+                <span>Time</span>
+                <strong>02:24 PM</strong>
+              </div>
+            </div>
+            <div className="meta-divider" aria-hidden="true" />
+            <div className="meta-item status-item">
+              <div className="meta-copy">
+                <span>Attendance Status</span>
+                <strong className="status-pill">Not Marked</strong>
+              </div>
+            </div>
           </div>
         </div>
-        <aside className="panel checkin-panel">
-          <p className="dash-eyebrow">CHECK-IN</p>
-          <h2>Before you begin</h2>
-          <div className="checkin-step"><span>01</span><p>Allow camera access for a clear preview.</p></div>
-          <div className="checkin-step"><span>02</span><p>Position yourself in a well-lit space.</p></div>
-          <div className="checkin-step"><span>03</span><p>Attendance can be submitted when identity verification is connected.</p></div>
-          <div className="notice-line"><FiShield size={16} aria-hidden="true" /> Camera is only activated when you start it.</div>
+
+        <aside className="attendance-tips-pane">
+          <div className="info-card tip-card">
+            <div className="info-card-header">
+              <div className="info-card-icon info-card-icon--soft"><FiInfo size={14} aria-hidden="true" /></div>
+              <h3>Scanning Tips</h3>
+              <button type="button" className="dismiss-button" aria-label="Close tips">×</button>
+            </div>
+            <ul>
+              <li>Make sure your face is clearly visible.</li>
+              <li>Ensure good lighting (avoid dark areas).</li>
+              <li>Keep your face steady and look straight.</li>
+            </ul>
+          </div>
+
+          <div className="info-card warning-card">
+            <div className="info-card-header">
+              <div className="info-card-icon info-card-icon--warn"><FiAlertTriangle size={14} aria-hidden="true" /></div>
+              <h3>Low Light Detected</h3>
+              <button type="button" className="dismiss-button" aria-label="Close warning">×</button>
+            </div>
+            <p>The light is a bit low, please make sure your face is well lit for better recognition.</p>
+          </div>
         </aside>
-      </section>
+      </div>
     </div>
   );
 }
@@ -226,7 +333,7 @@ export function ProfilePage() {
             <label>LinkedIn URL<input value={draft.linkedin || ""} onChange={(event) => setDraft({ ...draft, linkedin: event.target.value })} placeholder="https://linkedin.com/in/username" /></label>
             <label>Instagram URL<input value={draft.instagram || ""} onChange={(event) => setDraft({ ...draft, instagram: event.target.value })} placeholder="https://instagram.com/username" /></label>
           </div>
-          <button className="profile-edit-button" type="submit">Save profile</button>
+          <button className="profile-edit-button" type="submit" data-button-animation>Save profile</button>
         </form>
       )}
 

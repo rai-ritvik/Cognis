@@ -26,6 +26,7 @@ export default function DashboardLayout() {
   const location = useLocation();
   const user = getSession();
   const userName = user?.name || "Student";
+  const isMarkAttendanceRoute = location.pathname === "/mark-attendance";
   const [now, setNow] = useState(new Date());
   const [cameraOnline, setCameraOnline] = useState(false);
 
@@ -50,10 +51,10 @@ export default function DashboardLayout() {
   };
 
   return (
-    <div className="dash">
+    <div className={`dash${isMarkAttendanceRoute ? " mark-attendance-route" : ""}`}>
       <aside className="dash-sidebar">
         <NavLink className="dash-logo" to="/dashboard" aria-label="Netra home">
-          <img className="dash-logo-image" src="/netra-logo.svg" alt="Netra" />
+          <img className="dash-logo-image" src="/netra-logo.svg.png" alt="Netra" />
         </NavLink>
 
         <nav className="dash-nav" aria-label="Dashboard navigation">
@@ -81,47 +82,49 @@ export default function DashboardLayout() {
       </aside>
 
       <main className="dash-main">
-        <header className="dash-topbar">
-          <div className="dash-top-date">
-            <FiCalendar size={17} aria-hidden="true" />
-            <div className="dash-top-text">
-              <span>{now.toLocaleDateString("en-GB", {
-                weekday: "short",
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })}</span>
-              <span>{now.toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}</span>
+        {!isMarkAttendanceRoute && (
+          <header className="dash-topbar">
+            <div className="dash-top-date">
+              <FiCalendar size={17} aria-hidden="true" />
+              <div className="dash-top-text">
+                <span>{now.toLocaleDateString("en-GB", {
+                  weekday: "short",
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}</span>
+                <span>{now.toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}</span>
+              </div>
             </div>
-          </div>
 
-          <div className="dash-top-right">
-            <div className="camera-status">
-              <span className={`dash-cam-icon${cameraOnline ? "" : " off"}`}>
-                <FiCamera size={13} aria-hidden="true" />
-              </span>
-              <span className={cameraOnline ? "cam-online" : "cam-offline"}>
-                {cameraOnline ? "Camera ready" : "Camera unavailable"}
-              </span>
+            <div className="dash-top-right">
+              <div className="camera-status">
+                <span className={`dash-cam-icon${cameraOnline ? "" : " off"}`}>
+                  <FiCamera size={13} aria-hidden="true" />
+                </span>
+                <span className={cameraOnline ? "cam-online" : "cam-offline"}>
+                  {cameraOnline ? "Camera ready" : "Camera unavailable"}
+                </span>
+              </div>
+              <button
+                className="dash-user"
+                type="button"
+                onClick={() => navigate("/profile")}
+                aria-label={`Open profile for ${userName}`}
+              >
+                <span className="user-avatar" aria-hidden="true">
+                  {userName.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="dash-user-name">{userName}</span>
+              </button>
             </div>
-            <button
-              className="dash-user"
-              type="button"
-              onClick={() => navigate("/profile")}
-              aria-label={`Open profile for ${userName}`}
-            >
-              <span className="user-avatar" aria-hidden="true">
-                {userName.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="dash-user-name">{userName}</span>
-            </button>
-          </div>
-        </header>
+          </header>
+        )}
 
-        <div className="dash-route" key={location.pathname}>
+        <div className="dash-route page-content" key={location.pathname}>
           <Outlet />
         </div>
       </main>

@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 80" role="img" aria-labelledby="title">
-  <title id="title">Netra</title>
-  <g fill="#690000">
-    <path d="M28 44C43 25 65 16 87 13l4 6C73 23 61 31 55 41c-8 13-6 23 5 29-12-4-23-13-32-26Z"/>
-    <path fill-rule="evenodd" d="M44 44C57 29 75 23 95 28l17 16C100 59 84 69 67 72 55 68 46 58 44 44Zm20-1c4-10 14-15 24-12 10 3 15 13 12 23-3 9-12 14-21 12-9-2-13-10-10-18 2-6 8-9 14-7 5 2 7 7 4 11-2 4-8 4-10 0 0 5 4 8 9 7 6-1 9-8 6-14-3-7-11-9-18-6-8 4-11 13-7 21-7-4-9-10-3-17Z"/>
-    <text x="115" y="60" font-family="Georgia, 'Times New Roman', serif" font-size="54" font-weight="700" letter-spacing="0">Netra</text>
-  </g>
-</svg>

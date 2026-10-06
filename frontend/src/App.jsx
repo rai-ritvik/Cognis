@@ -5,6 +5,8 @@ import {
   Outlet,
   Route,
   Routes,
+  useLocation,
+  useNavigate,
 } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import DashboardLayout from "./pages/DashboardLayout";
@@ -16,6 +18,7 @@ import {
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import { getSession } from "./auth";
+import ButtonAnimation from "./ButtonAnimation";
 import "./index.css";
 
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
@@ -23,11 +26,63 @@ const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
 const Protected = ({ children }) =>
   getSession() ? children : <Navigate to="/login" replace />;
 
+const TRANSITION_VARIANTS = {
+  "/dashboard": "home",
+  "/mark-attendance": "attendance",
+  "/analytics": "analytics",
+  "/friends": "friends",
+  "/profile": "profile",
+  "/login": "login",
+  "/register": "register",
+};
+
+const TRANSITION_MS = 520;
+
+function PageTransition() {
+  const { pathname } = useLocation();
+  const previousPath = useRef(pathname);
+  const [transitionPath, setTransitionPath] = useState(null);
+
+  useEffect(() => {
+    if (previousPath.current === pathname) return;
+    previousPath.current = pathname;
+    setTransitionPath(pathname);
+    const timeout = window.setTimeout(() => setTransitionPath(null), TRANSITION_MS);
+    return () => window.clearTimeout(timeout);
+  }, [pathname]);
+
+  if (!transitionPath || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return null;
+  }
+
+  const variant = TRANSITION_VARIANTS[transitionPath] || "home";
+  return (
+    <div
+      key={transitionPath}
+      className={`route-transition route-transition--${variant}`}
+      aria-hidden="true"
+    />
+  );
+}
+
+function AttendanceStartHandler() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const openAttendancePage = () => navigate("/mark-attendance");
+    window.addEventListener("netra:start-camera", openAttendancePage);
+    return () => window.removeEventListener("netra:start-camera", openAttendancePage);
+  }, [navigate]);
+
+  return null;
+}
+
 const PULL_THRESHOLD = 48; // px of pull needed to flip the switch
 const MIN_PULL = -72; // max upward travel
 const MAX_PULL = 100; // max downward travel
 
 function AuthLayout() {
+  const { pathname } = useLocation();
   const [lampOn, setLampOn] = useState(false);
   const lampOnRef = useRef(false);
   const sceneRef = useRef(null);
@@ -171,10 +226,12 @@ function AuthLayout() {
 
       <section ref={cardRef} className="login-container" aria-hidden={!lampOn}>
         <div className="portal-brand" aria-label="Netra logo">
-          <img className="portal-logo" src="/netra-logo.svg" alt="Netra" />
+          <img className="portal-logo" src="/netra-logo.svg.png" alt="Netra" />
         </div>
         <h1 className="portal-title">SMART ATTENDANCE PORTAL</h1>
-        <Outlet />
+        <div className="page-content auth-route" key={pathname}>
+          <Outlet />
+        </div>
       </section>
     </main>
   );
@@ -183,6 +240,9 @@ function AuthLayout() {
 export default function App() {
   return (
     <BrowserRouter>
+      <ButtonAnimation />
+      <PageTransition />
+      <AttendanceStartHandler />
       <Routes>
         <Route element={<AuthLayout />}>
           <Route index element={<Navigate to="/login" replace />} />

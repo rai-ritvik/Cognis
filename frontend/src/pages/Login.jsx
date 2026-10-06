@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { afterButtonAnimation } from "../ButtonAnimation";
 import { loginUser } from "../auth";
 
 export default function Login() {
@@ -13,7 +14,7 @@ export default function Login() {
     e.preventDefault();
     try {
       loginUser(form);
-      navigate("/dashboard");
+      afterButtonAnimation(() => navigate("/dashboard"));
     } catch (err) {
       setError(err.message);
     }
@@ -33,7 +34,7 @@ export default function Login() {
       )}
 
       <div className="input-group">
-        <label htmlFor="studentId">Student number / ID</label>
+        <label htmlFor="studentId"> <h3>Student ID / Email</h3></label>
         <input
           id="studentId"
           name="studentId"
@@ -45,7 +46,7 @@ export default function Login() {
       </div>
 
       <div className="input-group">
-        <label htmlFor="password">Password</label>
+        <label htmlFor="password"> <h3>Password</h3></label>
         <input
           id="password"
           name="password"
@@ -57,8 +58,8 @@ export default function Login() {
         />
       </div>
 
-      <button type="submit" className="sign-in-button">
-        Log in
+      <button type="submit" className="sign-in-button" data-button-animation>
+        <h1> Log in</h1>
       </button>
 
       <p className="switch">
