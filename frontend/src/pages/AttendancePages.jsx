@@ -15,7 +15,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import AttendanceWelcome from "../AttendanceWelcome";
-import { getSession } from "../auth";
+import { getActiveAttendanceSession, getSession } from "../auth";
 import { MOCK_ATTENDANCE, MOCK_SUMMARY, fmtShort } from "./Dashboard";
 import "./Dashboard.css";
 
@@ -24,8 +24,44 @@ export function MarkAttendancePage() {
   const streamRef = useRef(null);
   const [cameraState, setCameraState] = useState("idle");
   const [cameraError, setCameraError] = useState("");
+  const [portalState, setPortalState] = useState("loading");
+  const [portalError, setPortalError] = useState("");
+  const [activeSession, setActiveSession] = useState(null);
   const [networkIssue, setNetworkIssue] = useState("");
   const [errorAnimationDone, setErrorAnimationDone] = useState(false);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    let isActive = true;
+    const checkPortal = async () => {
+      try {
+        const result = await getActiveAttendanceSession();
+        if (!isActive) return;
+        setActiveSession(result.session);
+        setPortalState(result.active ? "open" : "closed");
+        setPortalError("");
+        if (!result.active && streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+          if (videoRef.current) videoRef.current.srcObject = null;
+          setCameraState("idle");
+        }
+      } catch (error) {
+        if (!isActive) return;
+        setPortalState("error");
+        setPortalError(error.message || "Could not check whether attendance is open.");
+      }
+    };
+
+    checkPortal();
+    const portalTimer = window.setInterval(checkPortal, 15_000);
+    const clockTimer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => {
+      isActive = false;
+      window.clearInterval(portalTimer);
+      window.clearInterval(clockTimer);
+    };
+  }, []);
 
   useEffect(() => {
     const connection = navigator.connection;
@@ -78,6 +114,7 @@ export function MarkAttendancePage() {
   }, []);
 
   const startCamera = async () => {
+    if (portalState !== "open") return;
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraState("unsupported");
       setCameraError(
@@ -122,7 +159,15 @@ export function MarkAttendancePage() {
     <div className="mark-attendance-page">
       <div className="attendance-copy-block">
         <h1>Mark Your Attendance</h1>
-        <p>Position your face in the frame and click on start scanning</p>
+        <p>{activeSession ? `Session: ${activeSession.title}. Position your face in the frame and start scanning.` : "Your administrator will open the attendance portal when it is time to check in."}</p>
+      </div>
+
+      <div className={`attendance-portal-status is-${portalState}`} role={portalState === "error" ? "alert" : "status"} aria-live="polite">
+        <span className="attendance-portal-indicator" aria-hidden="true" />
+        <span>
+          <strong>{portalState === "loading" ? "Checking attendance availability…" : portalState === "open" ? "Attendance is open" : portalState === "error" ? "Portal status unavailable" : "Attendance is currently closed"}</strong>
+          <small>{portalState === "open" ? "You can check in for the active session." : portalState === "error" ? portalError : portalState === "closed" ? "Please wait for your administrator to open a session." : "Connecting to the attendance portal."}</small>
+        </span>
       </div>
 
       <div className="mark-attendance-layout">
@@ -136,9 +181,9 @@ export function MarkAttendancePage() {
             )}
           </div>
 
-          <button className="action-button" type="button" onClick={startCamera} disabled={cameraState === "loading" || cameraState === "unsupported"}>
+          <button className="action-button" type="button" onClick={startCamera} disabled={portalState !== "open" || cameraState === "loading" || cameraState === "unsupported"}>
             <FiCamera size={16} aria-hidden="true" />
-            {cameraState === "loading" ? "Connecting…" : "Start Scanning"}
+            {cameraState === "loading" ? "Connecting…" : portalState === "open" ? "Start Scanning" : "Attendance portal closed"}
           </button>
 
           <div className="camera-meta-row">
@@ -146,7 +191,7 @@ export function MarkAttendancePage() {
               <div className="meta-icon"><FiCalendar size={16} aria-hidden="true" /></div>
               <div className="meta-copy">
                 <span>Date</span>
-                <strong>Tue, 30 Sep 2025</strong>
+                <strong>{now.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}</strong>
               </div>
             </div>
             <div className="meta-divider" aria-hidden="true" />
@@ -154,7 +199,7 @@ export function MarkAttendancePage() {
               <div className="meta-icon"><FiClock size={16} aria-hidden="true" /></div>
               <div className="meta-copy">
                 <span>Time</span>
-                <strong>02:24 PM</strong>
+                <strong>{now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</strong>
               </div>
             </div>
             <div className="meta-divider" aria-hidden="true" />

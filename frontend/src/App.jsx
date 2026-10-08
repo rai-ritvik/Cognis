@@ -10,6 +10,8 @@ import {
 } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import DashboardLayout from "./pages/DashboardLayout";
+import AdminDashboard from "./pages/AdminDashboard";
+import AdminLogin from "./pages/AdminLogin";
 import {
   FriendsPage,
   MarkAttendancePage,
@@ -23,8 +25,15 @@ import "./index.css";
 
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
 
-const Protected = ({ children }) =>
-  getSession() ? children : <Navigate to="/login" replace />;
+const Protected = ({ children, role }) => {
+  const session = getSession();
+  if (!session) return <Navigate to={role === "admin" ? "/admin/login" : "/login"} replace />;
+  const sessionRole = session.role || "student";
+  if (role && sessionRole !== role) {
+    return <Navigate to={sessionRole === "admin" ? "/admin" : "/dashboard"} replace />;
+  }
+  return children;
+};
 
 const TRANSITION_VARIANTS = {
   "/dashboard": "home",
@@ -34,6 +43,8 @@ const TRANSITION_VARIANTS = {
   "/profile": "profile",
   "/login": "login",
   "/register": "register",
+  "/admin/login": "login",
+  "/admin": "home",
 };
 
 const TRANSITION_MS = 520;
@@ -102,12 +113,16 @@ function AuthLayout() {
     setLampOn(on);
   };
 
+  useEffect(() => {
+    if (pathname === "/admin/login") setLamp(true);
+  }, [pathname]);
+
   const setPull = (distance) => {
     const d = Math.max(MIN_PULL, Math.min(MAX_PULL, distance));
     sceneRef.current.style.setProperty("--pull-distance", `${d}px`);
   };
 
-  // Card is unreachable (mouse, touch and keyboard) while the lamp is off
+  // Keep auth controls unavailable until the lamp is switched on.
   useEffect(() => {
     cardRef.current.inert = !lampOn;
   }, [lampOn]);
@@ -115,13 +130,16 @@ function AuthLayout() {
   // Keep the light glow centred on the bulb at every screen size
   useEffect(() => {
     const place = () => {
-      const s = sceneRef.current.getBoundingClientRect();
-      const b = bulbRef.current.getBoundingClientRect();
-      sceneRef.current.style.setProperty(
+      const scene = sceneRef.current;
+      const bulb = bulbRef.current;
+      if (!scene || !bulb) return;
+      const s = scene.getBoundingClientRect();
+      const b = bulb.getBoundingClientRect();
+      scene.style.setProperty(
         "--lamp-x",
         `${b.left + b.width / 2 - s.left}px`,
       );
-      sceneRef.current.style.setProperty(
+      scene.style.setProperty(
         "--lamp-y",
         `${b.top + b.height / 2 - s.top}px`,
       );
@@ -192,7 +210,7 @@ function AuthLayout() {
   return (
     <main
       ref={sceneRef}
-      className={`scene ${lampOn ? "light-on" : "light-off"}`}
+      className={`scene ${lampOn ? "light-on" : "light-off"}${pathname === "/login" || pathname === "/register" ? " scene--auth" : ""}`}
     >
       <section className="lamp-stage" aria-label="Pull-cord lamp">
         <div ref={lampRef} className="lamp" data-dragging="false">
@@ -224,7 +242,11 @@ function AuthLayout() {
         <p className="hint">Pull the cord down</p>
       </section>
 
-      <section ref={cardRef} className="login-container" aria-hidden={!lampOn}>
+      <section
+        ref={cardRef}
+        className={`login-container${pathname === "/login" ? " login-container--login" : ""}`}
+        aria-hidden={!lampOn}
+      >
         <div className="portal-brand" aria-label="Netra logo">
           <img className="portal-logo" src="/netra-logo.svg.png" alt="Netra" />
         </div>
@@ -248,8 +270,10 @@ export default function App() {
           <Route index element={<Navigate to="/login" replace />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
+          <Route path="admin/login" element={<AdminLogin />} />
         </Route>
-        <Route element={<Protected><DashboardLayout /></Protected>}>
+        <Route path="admin" element={<Protected role="admin"><AdminDashboard /></Protected>} />
+        <Route element={<Protected role="student"><DashboardLayout /></Protected>}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="mark-attendance" element={<MarkAttendancePage />} />

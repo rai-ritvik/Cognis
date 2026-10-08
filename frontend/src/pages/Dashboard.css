@@ -348,6 +348,28 @@
 .mark-card:hover .mark-card-arrow { transform: translateX(8px); }
 .mark-card:focus-visible { outline: 3px solid #ffd98a; outline-offset: 3px; }
 
+.attendance-portal-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 12px 15px;
+  border: 1px solid #e7ded5;
+  border-radius: 8px;
+  background: #fff;
+}
+.attendance-portal-status > span:last-child { display: flex; flex-direction: column; gap: 3px; }
+.attendance-portal-status strong { color: #433a35; font-size: 12px; }
+.attendance-portal-status small { color: #7c726c; font-size: 10px; line-height: 1.5; }
+.attendance-portal-indicator { width: 9px; height: 9px; flex: 0 0 9px; margin-top: 3px; border-radius: 50%; background: #aaa19b; }
+.attendance-portal-status.is-open { border-color: #c8e7d0; background: #f4fbf5; }
+.attendance-portal-status.is-open strong { color: #187342; }
+.attendance-portal-status.is-open .attendance-portal-indicator { background: #20a957; box-shadow: 0 0 0 4px rgba(32,169,87,.12); }
+.attendance-portal-status.is-error { border-color: #efc8c3; background: #fff5f3; }
+.attendance-portal-status.is-error strong { color: #972b25; }
+.attendance-portal-status.is-error small { color: #8e514c; }
+.attendance-portal-status.is-error .attendance-portal-indicator { background: #cf4338; }
+
 .subpage-heading { margin: 5px 0 24px; }
 .subpage-heading h1 { margin: 0; color: var(--dash-text); font-family: "Playfair Display", serif; font-size: clamp(27px, 4vw, 36px); }
 .subpage-heading > p:last-child { margin: 7px 0 0; color: var(--dash-muted); font-size: 13px; }
