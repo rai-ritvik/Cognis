@@ -1,0 +1,8 @@
+insightface
+onnx==1.20.1
+onnxruntime
+mediapipe==0.10.35
+numpy
+opencv-python-headless
+fastapi
+uvicorn[standard]
