@@ -1,6 +1,6 @@
 const { z } = require('zod');
 
-const roll = z.string().regex(/^\d{13}$/, 'Student number must be exactly 13 digits');
+const roll = z.string().regex(/^\d{8,13}$/, 'Registration number must be 8 to 13 digits');
 const password = z.string().min(8, 'Password must be at least 8 characters').max(72);
 const image = z.string().min(100, 'Image frame is missing or too small').max(360_000, 'Each image frame must be at most 360 KB');
 const enrollmentFrames = z.array(image).min(3, 'Enrollment requires at least 3 frames').max(8, 'Enrollment accepts at most 8 frames');
