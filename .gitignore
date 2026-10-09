@@ -4,4 +4,4 @@ __pycache__/
 .env
 .DS_Store
 
-Face detection & recognition/models/buffalo_sc/
+face-detection-recognition/models/buffalo_sc/
