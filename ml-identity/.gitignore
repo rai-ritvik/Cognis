@@ -1,9 +1,0 @@
-.venv/
-__pycache__/
-*.pyc
-.DS_Store
-.env
-*.jpg
-*.jpeg
-*.png
-enroll_request.json
