@@ -21,7 +21,7 @@ async function logAlert({ memberId, sessionId, reason, score = null, details = n
 // POST /api/attendance/checkin   (student, logged in)
 // Order is cheapest -> most expensive: session -> duplicate -> room code -> location -> face
 const checkIn = async (req, res) => {
-  const { session_id, room_token, latitude, longitude, image_base64 } = req.valid.body;
+  const { session_id, room_token, latitude, longitude, frames } = req.valid.body;
   const memberId = req.user.id; // identity comes from the login token, NEVER from the request body
 
   let session = unwrap(
@@ -59,21 +59,30 @@ const checkIn = async (req, res) => {
   const g = Array.isArray(geo.data) ? geo.data[0] : geo.data;
   if (!g || !g.is_within_radius) {
     await logAlert({
-      memberId, sessionId: session_id, reason: 'OUTSIDE_RADIUS', image: image_base64,
+      memberId, sessionId: session_id, reason: 'OUTSIDE_RADIUS', image: frames[0],
       details: `distance_m=${g && g.distance_meters != null ? Math.round(g.distance_meters) : 'unknown'}`,
     });
     throw new AppError(403, 'You are outside the allowed lab area.', 'OUTSIDE_RADIUS');
   }
 
-  // Face (ML1). If ML1 is down this throws 503 -> nobody is auto-approved.
-  const { faceDetected, confidence } = await ml.verifyFace(image_base64, member.face_embedding);
-  if (!faceDetected) throw new AppError(422, 'No face detected. Look at the camera and try again.', 'NO_FACE');
+  // ML service checks multi-frame identity + blink/liveness. If it is down,
+  // ml.verifyFace throws and attendance is never approved (fail closed).
+  const verification = await ml.verifyFace(frames, member.face_embedding);
+  const confidence = verification.similarity;
 
-  if (confidence < env.reviewThreshold) {
-    await logAlert({ memberId, sessionId: session_id, reason: 'FACE_MISMATCH', score: confidence, image: image_base64 });
-    throw new AppError(403, 'Your face did not match your registered photo.', 'FACE_MISMATCH');
+  if (!verification.livenessPassed) {
+    await logAlert({ memberId, sessionId: session_id, reason: 'LIVENESS_FAILED', score: confidence, image: frames[0], details: verification.reason || 'Liveness challenge failed' });
+    throw new AppError(403, 'Liveness check failed. Please capture a live camera sequence and try again.', 'LIVENESS_FAILED');
   }
 
+  if (!verification.verified) {
+    await logAlert({ memberId, sessionId: session_id, reason: 'FACE_MISMATCH', score: confidence, image: frames[0], details: verification.reason || 'ML identity verification failed' });
+    throw new AppError(403, 'Your face could not be verified against the registered face.', 'FACE_MISMATCH');
+  }
+
+  // Only an ML-approved identity AND passed liveness can become attendance.
+  // The local auto threshold is for manual-review triage, not a replacement
+  // for the ML service's identity/liveness decision.
   const status = confidence >= env.autoThreshold ? 'PRESENT' : 'PENDING_REVIEW';
   const { data: row, error } = await supabase
     .from('attendance')
@@ -87,7 +96,7 @@ const checkIn = async (req, res) => {
   }
 
   if (status === 'PENDING_REVIEW') {
-    await logAlert({ memberId, sessionId: session_id, reason: 'LOW_CONFIDENCE', score: confidence, image: image_base64, attendanceId: row.id });
+    await logAlert({ memberId, sessionId: session_id, reason: 'LOW_CONFIDENCE', score: confidence, image: frames[0], attendanceId: row.id });
   }
 
   // We do not send the match score back (it would help someone tune an attack).

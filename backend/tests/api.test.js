@@ -19,14 +19,14 @@ require.cache[clientPath] = { id: clientPath, filename: clientPath, loaded: true
 
 // Replace the ML service with a controllable stub.
 const ml = require('../services/mlService');
-const mlState = { down: false, faceDetected: true, confidence: 0.95 };
+const mlState = { down: false, verified: true, livenessPassed: true, similarity: 0.95, reason: null };
 ml.getEmbedding = async () => {
   if (mlState.down) { const A = require('../utils/AppError'); throw new A(503, 'Face recognition service is unavailable. Try again shortly.', 'ML_DOWN'); }
   return new Array(8).fill(0.1);
 };
 ml.verifyFace = async () => {
   if (mlState.down) { const A = require('../utils/AppError'); throw new A(503, 'Face recognition service is unavailable. Try again shortly.', 'ML_DOWN'); }
-  return { faceDetected: mlState.faceDetected, confidence: mlState.confidence };
+  return { verified: mlState.verified, livenessPassed: mlState.livenessPassed, similarity: mlState.similarity, reason: mlState.reason };
 };
 
 const app = require('../server');
@@ -46,7 +46,9 @@ async function api(method, url, { token, body } = {}) {
   let json = null; try { json = await res.json(); } catch (e) { /* no body */ }
   return { status: res.status, json };
 }
-const registerBody = (roll, email) => ({ roll_number: roll, full_name: 'Test ' + roll.slice(-3), email, password: 'Passw0rd!x', domain: 'Backend', year: '2nd', consent: true, image_base64: IMG });
+const ENROLL_FRAMES = Array.from({ length: 5 }, () => IMG);
+const ATTENDANCE_FRAMES = Array.from({ length: 15 }, () => IMG);
+const registerBody = (roll, email) => ({ roll_number: roll, full_name: 'Test ' + roll.slice(-3), email, password: 'Passw0rd!x', domain: 'Backend', year: '2nd', consent: true, frames: ENROLL_FRAMES });
 const login = async (roll, password = 'Passw0rd!x') => (await api('POST', '/api/auth/login', { body: { roll_number: roll, password } }));
 
 test.before(async () => {
@@ -99,6 +101,14 @@ test('register fails closed when ML1 is down (no fallback)', async () => {
   assert.equal(fake.db.members.some((m) => m.roll_number === '2500271530299'), false);
 });
 
+
+test('registration requires 3-8 frames and attendance requires 15-20 frames', async () => {
+  const badRegister = await api('POST', '/api/auth/register', { body: { ...registerBody('2500271530298', 'frames@x.com'), frames: [IMG] } });
+  assert.equal(badRegister.status, 400);
+  const noToken = await api('POST', '/api/attendance/checkin', { body: { session_id: '00000000-0000-4000-8000-000000000001', room_token: '1234', latitude: 28.6139, longitude: 77.2090, frames: [IMG] } });
+  assert.equal(noToken.status, 401);
+});
+
 test('login: wrong password 401, right password returns token with role', async () => {
   assert.equal((await login(S1, 'wrongpass1')).status, 401);
   const ok = await login(S1);
@@ -135,7 +145,7 @@ test('admin starts a session; second start is blocked; students can find it but 
   assert.equal(adm.json.session.room_token, roomToken);
 });
 
-const checkin = (token, over = {}) => api('POST', '/api/attendance/checkin', { token, body: { session_id: sessionId, room_token: roomToken, latitude: 28.6139, longitude: 77.2090, image_base64: IMG, ...over } });
+const checkin = (token, over = {}) => api('POST', '/api/attendance/checkin', { token, body: { session_id: sessionId, room_token: roomToken, latitude: 28.6139, longitude: 77.2090, frames: ATTENDANCE_FRAMES, ...over } });
 
 test('check-in rejects wrong room code', async () => {
   const wrong = roomToken === '0000' ? '1111' : '0000';
@@ -143,26 +153,32 @@ test('check-in rejects wrong room code', async () => {
   assert.equal(r.status, 403); assert.equal(r.json.code, 'BAD_TOKEN');
 });
 
-test('check-in rejects a student standing outside the radius and logs an alert with the photo', async () => {
+test('check-in rejects a student standing outside the radius and logs an alert with a frame', async () => {
   const r = await checkin(s1Token, { latitude: 28.6160, longitude: 77.2090 }); // ~230 m away
   assert.equal(r.status, 403); assert.equal(r.json.code, 'OUTSIDE_RADIUS');
   const alert = fake.db.spoof_alerts.find((a) => a.reason === 'OUTSIDE_RADIUS');
   assert.ok(alert && alert.image_base64);
 });
 
-test('check-in FAILS CLOSED if ML1 is down (nobody auto-approved)', async () => {
+test('check-in FAILS CLOSED if ML service is down (nobody auto-approved)', async () => {
   mlState.down = true; const r = await checkin(s1Token); mlState.down = false;
   assert.equal(r.status, 503);
   assert.equal(fake.db.attendance.length, 0);
 });
 
-test('check-in: no face detected -> 422, nothing saved', async () => {
-  mlState.faceDetected = false; const r = await checkin(s1Token); mlState.faceDetected = true;
-  assert.equal(r.status, 422); assert.equal(fake.db.attendance.length, 0);
+test('check-in: failed liveness -> 403, alert logged, nothing saved', async () => {
+  mlState.livenessPassed = false; mlState.verified = false; mlState.reason = 'BLINK_CHALLENGE_FAILED';
+  const r = await checkin(s1Token);
+  mlState.livenessPassed = true; mlState.verified = true; mlState.reason = null;
+  assert.equal(r.status, 403); assert.equal(r.json.code, 'LIVENESS_FAILED');
+  assert.equal(fake.db.attendance.length, 0);
+  assert.ok(fake.db.spoof_alerts.some((a) => a.reason === 'LIVENESS_FAILED'));
 });
 
 test('check-in: face mismatch -> 403 and alert logged', async () => {
-  mlState.confidence = 0.2; const r = await checkin(s1Token); mlState.confidence = 0.95;
+  mlState.verified = false; mlState.similarity = 0.2; mlState.reason = 'FACE_SIMILARITY_FAILED';
+  const r = await checkin(s1Token);
+  mlState.verified = true; mlState.similarity = 0.95; mlState.reason = null;
   assert.equal(r.status, 403); assert.equal(r.json.code, 'FACE_MISMATCH');
   assert.ok(fake.db.spoof_alerts.some((a) => a.reason === 'FACE_MISMATCH'));
 });
@@ -175,8 +191,8 @@ test('check-in success -> PRESENT, no score leaked; duplicate -> 409', async () 
   assert.equal(dup.status, 409);
 });
 
-test('borderline score -> PENDING_REVIEW, admin approves it', async () => {
-  mlState.confidence = 0.7; const r = await checkin(s2Token); mlState.confidence = 0.95;
+test('ML-verified borderline score -> PENDING_REVIEW, admin approves it', async () => {
+  mlState.similarity = 0.7; const r = await checkin(s2Token); mlState.similarity = 0.95;
   assert.equal(r.status, 201); assert.equal(r.json.status, 'PENDING_REVIEW');
   const alerts = await api('GET', '/api/admin/alerts', { token: adminToken });
   const low = alerts.json.alerts.find((a) => a.reason === 'LOW_CONFIDENCE');
@@ -197,7 +213,7 @@ test('rotating the code: new code works, old code works only briefly, then sessi
   assert.equal(row.current_room_token, rot.json.room_token);
   const end = await api('POST', '/api/sessions/end', { token: adminToken, body: { session_id: sessionId } });
   assert.equal(end.status, 200);
-  const r = await api('POST', '/api/attendance/checkin', { token: s1Token, body: { session_id: sessionId, room_token: rot.json.room_token, latitude: 28.6139, longitude: 77.2090, image_base64: IMG } });
+  const r = await api('POST', '/api/attendance/checkin', { token: s1Token, body: { session_id: sessionId, room_token: rot.json.room_token, latitude: 28.6139, longitude: 77.2090, frames: ATTENDANCE_FRAMES } });
   assert.equal(r.status, 400);
 });
 
@@ -206,7 +222,7 @@ test('expired room code is rejected (server-side expiry, not just frontend)', as
   const sid = st.json.session_id; const tok = st.json.room_token;
   const row = fake.db.sessions.find((s) => s.id === sid);
   row.token_expires_at = new Date(Date.now() - 60000).toISOString(); // pretend it expired a minute ago
-  const r = await api('POST', '/api/attendance/checkin', { token: s1Token, body: { session_id: sid, room_token: tok, latitude: 28.6139, longitude: 77.2090, image_base64: IMG } });
+  const r = await api('POST', '/api/attendance/checkin', { token: s1Token, body: { session_id: sid, room_token: tok, latitude: 28.6139, longitude: 77.2090, frames: ATTENDANCE_FRAMES } });
   assert.equal(r.status, 403); assert.equal(r.json.code, 'BAD_TOKEN');
   await api('POST', '/api/sessions/end', { token: adminToken, body: { session_id: sid } });
 });

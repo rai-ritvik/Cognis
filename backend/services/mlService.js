@@ -2,47 +2,84 @@ const axios = require('axios');
 const env = require('../config/env');
 const AppError = require('../utils/AppError');
 
-// Talks to the ML1 (face) microservice. Contract is documented in docs/ML1_CONTRACT.md
-//   POST /embed  { image_base64 }             -> { face_detected, embedding: number[] }
-//   POST /verify { image_base64, embedding }  -> { face_detected, match, confidence }
-const client = axios.create({ baseURL: env.ml1Url, timeout: 15000 });
+// Contract from face-detection-recognition/app/main.py:
+// POST /enroll { student_id, full_name, frames[3..8] }
+//   -> { success, reference_embedding: number[512], ... }
+// POST /verify { reference_embedding: number[512], frames[15..20] }
+//   -> { success, verified, similarity, liveness: { passed }, reason, ... }
+const client = axios.create({
+  baseURL: env.ml1Url.replace(/\/+$/, ''),
+  timeout: env.mlTimeoutMs,
+  maxBodyLength: 10 * 1024 * 1024,
+  maxContentLength: 10 * 1024 * 1024,
+});
 
-// "data:image/jpeg;base64,AAAA..." -> "AAAA..."
-const stripPrefix = (b64) => b64.replace(/^data:image\/[a-zA-Z+.-]+;base64,/, '');
+function requestConfig() {
+  return env.mlApiKey ? { headers: { 'X-API-Key': env.mlApiKey } } : {};
+}
 
-function toAppError(e) {
-  if (e instanceof AppError) return e;
-  if (e.response) {
-    if (e.response.status === 422) return new AppError(422, 'No face detected. Look at the camera and try again.', 'NO_FACE');
-    console.error('[ml1] bad response', e.response.status, e.response.data);
+function toAppError(error) {
+  if (error instanceof AppError) return error;
+
+  if (error.response) {
+    const status = error.response.status;
+    if (status === 400 || status === 413 || status === 422) {
+      // Do not expose detailed image/model diagnostics to every caller.
+      return new AppError(422, 'The ML service could not process these frames. Capture clear, supported camera frames and try again.', 'ML_INVALID_INPUT');
+    }
+    if (status === 401 || status === 403) {
+      console.error('[ml1] authentication/configuration rejected by ML service:', status);
+      return new AppError(502, 'Face recognition service authentication is misconfigured', 'ML_AUTH_ERROR');
+    }
+    console.error('[ml1] service error:', status);
     return new AppError(502, 'Face recognition service returned an error', 'ML_ERROR');
   }
-  console.error('[ml1] unreachable:', e.code || e.message);
-  // FAIL CLOSED: if the face service is down, nobody gets attendance by default.
+
+  console.error('[ml1] unreachable:', error.code || error.message);
+  // Fail closed: never approve attendance when the ML service is unavailable.
   return new AppError(503, 'Face recognition service is unavailable. Try again shortly.', 'ML_DOWN');
 }
 
-async function getEmbedding(imageBase64) {
+async function getEmbedding(rollNumber, fullName, frames) {
   try {
-    const { data } = await client.post('/embed', { image_base64: stripPrefix(imageBase64) });
-    if (!data.face_detected) throw new AppError(422, 'No face detected. Look at the camera and try again.', 'NO_FACE');
-    if (!Array.isArray(data.embedding) || data.embedding.length === 0) {
-      throw new AppError(502, 'Face recognition service returned an invalid response', 'ML_ERROR');
+    const { data } = await client.post('/enroll', {
+      student_id: rollNumber,
+      full_name: fullName,
+      frames,
+    }, requestConfig());
+
+    if (data?.success !== true || !Array.isArray(data.reference_embedding) ||
+        data.reference_embedding.length !== 512 ||
+        !data.reference_embedding.every((value) => Number.isFinite(value))) {
+      throw new AppError(502, 'Face recognition service returned an invalid enrollment response', 'ML_ERROR');
     }
-    return data.embedding;
-  } catch (e) {
-    throw toAppError(e);
+    return data.reference_embedding;
+  } catch (error) {
+    throw toAppError(error);
   }
 }
 
-async function verifyFace(imageBase64, embedding) {
+async function verifyFace(frames, referenceEmbedding) {
   try {
-    const { data } = await client.post('/verify', { image_base64: stripPrefix(imageBase64), embedding });
-    if (typeof data.face_detected !== 'boolean') throw new AppError(502, 'Face recognition service returned an invalid response', 'ML_ERROR');
-    if (data.face_detected && typeof data.confidence !== 'number') throw new AppError(502, 'Face recognition service returned an invalid response', 'ML_ERROR');
-    return { faceDetected: data.face_detected, confidence: data.confidence };
-  } catch (e) {
-    throw toAppError(e);
+    const { data } = await client.post('/verify', {
+      reference_embedding: referenceEmbedding,
+      frames,
+    }, requestConfig());
+
+    if (data?.success !== true || typeof data.verified !== 'boolean' ||
+        !data.liveness || typeof data.liveness.passed !== 'boolean' ||
+        (data.verified && typeof data.similarity !== 'number')) {
+      throw new AppError(502, 'Face recognition service returned an invalid verification response', 'ML_ERROR');
+    }
+
+    return {
+      verified: data.verified,
+      livenessPassed: data.liveness.passed,
+      similarity: typeof data.similarity === 'number' ? data.similarity : null,
+      reason: data.reason || data.liveness.reason || null,
+    };
+  } catch (error) {
+    throw toAppError(error);
   }
 }
 

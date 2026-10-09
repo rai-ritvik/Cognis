@@ -17,7 +17,7 @@ const signLogin = (m) => jwt.sign({ role: m.role, roll: m.roll_number }, env.jwt
 // POST /api/auth/register
 const register = async (req, res) => {
   const b = req.valid.body;
-  const embedding = await ml.getEmbedding(b.image_base64); // fails (no fallback) if ML1 is down or no face
+  const embedding = await ml.getEmbedding(b.roll_number, b.full_name, b.frames); // fails closed if enrollment/liveness service is unavailable
   const password_hash = await bcrypt.hash(b.password, 10);
 
   const { data, error } = await supabase

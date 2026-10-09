@@ -2,7 +2,9 @@ const { z } = require('zod');
 
 const roll = z.string().regex(/^\d{13}$/, 'Student number must be exactly 13 digits');
 const password = z.string().min(8, 'Password must be at least 8 characters').max(72);
-const image = z.string().min(100, 'Image is missing or too small').max(8_000_000, 'Image is too large');
+const image = z.string().min(100, 'Image frame is missing or too small').max(360_000, 'Each image frame must be at most 360 KB');
+const enrollmentFrames = z.array(image).min(3, 'Enrollment requires at least 3 frames').max(8, 'Enrollment accepts at most 8 frames');
+const attendanceFrames = z.array(image).min(15, 'Attendance verification requires at least 15 frames').max(20, 'Attendance verification accepts at most 20 frames');
 const uuid = z.string().uuid();
 const optionalText = (max) => z.string().trim().max(max).optional();
 const githubHandle = z.string().trim().regex(/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,38})$/, 'Invalid GitHub username');
@@ -19,7 +21,7 @@ const s = {
     year: z.string().trim().min(1).max(10),
     github_handle: githubHandle.optional(),
     consent: z.boolean().refine((v) => v === true, 'Biometric consent is required'),
-    image_base64: image,
+    frames: enrollmentFrames,
   }),
   login: z.object({ roll_number: roll, password: z.string().min(1).max(72) }),
   forgot: z.object({ roll_number: roll }),
@@ -31,7 +33,7 @@ const s = {
     room_token: z.string().regex(/^\d{4}$/, 'Room code must be 4 digits'),
     latitude: z.coerce.number().min(-90).max(90),
     longitude: z.coerce.number().min(-180).max(180),
-    image_base64: image,
+    frames: attendanceFrames,
   }),
 
   startSession: z.object({

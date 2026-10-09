@@ -18,7 +18,9 @@ module.exports = {
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173').split(',').map((s) => s.trim()),
 
   // ML1 (face match) service
-  ml1Url: process.env.ML1_URL || 'http://localhost:8001',
+  ml1Url: process.env.ML1_URL || 'https://omni-face-ml-api.onrender.com',
+  mlApiKey: process.env.ML_API_KEY || '',
+  mlTimeoutMs: num(process.env.ML_TIMEOUT_MS, 120000),
   autoThreshold: num(process.env.MATCH_AUTO_THRESHOLD, 0.8),   // >= this  -> PRESENT
   reviewThreshold: num(process.env.MATCH_REVIEW_THRESHOLD, 0.6), // >= this  -> PENDING_REVIEW, below -> rejected
 
