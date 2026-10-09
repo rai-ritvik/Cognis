@@ -1,4 +1,4 @@
-# OmniScan / Netra - Backend
+# Cognis - Backend
 
 Express 5 + Supabase (Postgres/PostGIS). Face matching is done by the separate ML1 service.
 
