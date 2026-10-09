@@ -2,7 +2,6 @@ import base64
 import json
 import time
 from pathlib import Path
-
 import cv2
 
 
