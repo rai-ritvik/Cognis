@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import base64
 import binascii
 import gc
@@ -45,9 +44,7 @@ except Exception:
     pass
 
 
-# ============================================================================
 # CONFIGURATION
-# ============================================================================
 
 @dataclass(frozen=True)
 class ServiceConfig:
@@ -162,9 +159,7 @@ class ServiceConfig:
 CONFIG = ServiceConfig()
 
 
-# ============================================================================
 # VALIDATION ERROR
-# ============================================================================
 
 class MLValidationError(ValueError):
     def __init__(self, code: str, message: str):
@@ -173,9 +168,7 @@ class MLValidationError(ValueError):
         self.message = message
 
 
-# ============================================================================
 # FACE ML SERVICE
-# ============================================================================
 
 class FaceMLService:
     """Stateless face ML service for enrollment and verification."""
@@ -184,9 +177,7 @@ class FaceMLService:
         self.config = config
         self._load_models()
 
-    # ========================================================================
     # MODEL LOADING
-    # ========================================================================
 
     def _ensure_insightface_pack(self) -> None:
         """Ensure the small buffalo_sc ONNX pack is available locally."""
@@ -310,9 +301,7 @@ class FaceMLService:
             options
         )
 
-    # ========================================================================
     # EMBEDDINGS
-    # ========================================================================
 
     @staticmethod
     def normalize_embedding(
@@ -341,9 +330,7 @@ class FaceMLService:
 
         return arr / norm
 
-    # ========================================================================
     # FRAME DECODING
-    # ========================================================================
 
     def decode_frame(self, frame_payload: str) -> np.ndarray:
         if not isinstance(frame_payload, str) or not frame_payload.strip():
@@ -432,9 +419,7 @@ class FaceMLService:
 
         return [self.decode_frame(frame) for frame in frames]
 
-    # ========================================================================
     # FACE DETECTION + EMBEDDING
-    # ========================================================================
 
     def extract_face_embedding(
         self,
@@ -474,9 +459,7 @@ class FaceMLService:
 
         return embedding, face
 
-    # ========================================================================
     # FACE QUALITY
-    # ========================================================================
 
     def assess_face_quality(
         self,
@@ -535,9 +518,7 @@ class FaceMLService:
             "min_blur_variance": float(self.config.min_blur_variance),
         }
 
-    # ========================================================================
     # SIMILARITY
-    # ========================================================================
 
     def cosine_similarity(
         self,
@@ -555,9 +536,7 @@ class FaceMLService:
 
         return float(np.dot(a_n, b_n))
 
-    # ========================================================================
     # FRAME SELECTION
-    # ========================================================================
 
     @staticmethod
     def select_temporally_distributed(
@@ -596,9 +575,7 @@ class FaceMLService:
 
         return sorted(selected, key=lambda x: x["index"])
 
-    # ========================================================================
     # ENROLLMENT
-    # ========================================================================
 
     def enroll(
         self,
@@ -750,9 +727,7 @@ class FaceMLService:
             },
         }
 
-    # ========================================================================
     # BLINK / LIVENESS
-    # ========================================================================
 
     def get_blink_score(
         self,
@@ -1005,9 +980,7 @@ class FaceMLService:
                 del image
         return observations
 
-    # ========================================================================
     # VERIFICATION
-    # ========================================================================
 
     def verify(
         self,
@@ -1202,9 +1175,7 @@ class FaceMLService:
             "reason": None if verified else "FACE_SIMILARITY_FAILED",
         }
 
-    # ========================================================================
     # HEALTH
-    # ========================================================================
 
     def health(self) -> dict[str, Any]:
         # On Render/Linux, VmHWM is the process peak resident memory in KiB.

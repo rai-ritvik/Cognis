@@ -1,14 +1,10 @@
 from __future__ import annotations
-
 import os
 from typing import Annotated, Any
-
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 import threading
-
 from pydantic import BaseModel, Field
-
 from .face_service import FaceMLService, MLValidationError
 
 
@@ -18,8 +14,6 @@ API_KEY = os.getenv("ML_API_KEY")
 MAX_REQUEST_BYTES = int(os.getenv("MAX_REQUEST_BYTES", str(8 * 1024 * 1024)))
 MAX_FRAME_CHARS = int(os.getenv("MAX_FRAME_CHARS", "360000"))
 
-# A 512 MB instance should never run two ONNX/MediaPipe jobs concurrently.
-# Requests wait here instead of duplicating the model's native memory use.
 ML_LOCK = threading.Lock()
 
 
@@ -59,9 +53,7 @@ async def limit_request_body(request: Request, call_next):
     return await call_next(request)
 
 
-# ============================================================================
 # REQUEST MODELS
-# ============================================================================
 
 FramePayload = Annotated[str, Field(min_length=16, max_length=MAX_FRAME_CHARS)]
 
@@ -77,9 +69,8 @@ class VerificationRequest(BaseModel):
     frames: list[FramePayload] = Field(min_length=15, max_length=20)
 
 
-# ============================================================================
+
 # HEALTH RESPONSE
-# ============================================================================
 
 class HealthResponse(BaseModel):
     status: str
@@ -101,9 +92,7 @@ class HealthResponse(BaseModel):
     storage: str
 
 
-# ============================================================================
 # API KEY
-# ============================================================================
 
 def check_api_key(
     x_api_key: str | None,
@@ -125,9 +114,7 @@ def check_api_key(
         )
 
 
-# ============================================================================
 # ROOT
-# ============================================================================
 
 @app.get(
     "/",
@@ -142,9 +129,8 @@ def root() -> dict[str, Any]:
     }
 
 
-# ============================================================================
+
 # HEALTH
-# ============================================================================
 
 @app.get(
     "/health",
@@ -159,9 +145,8 @@ def health(
     return service.health()
 
 
-# ============================================================================
+
 # ENROLLMENT
-# ============================================================================
 
 @app.post("/enroll")
 def enroll(
@@ -209,9 +194,8 @@ def enroll(
         ) from exc
 
 
-# ============================================================================
+
 # VERIFICATION
-# ============================================================================
 
 @app.post("/verify")
 def verify(
