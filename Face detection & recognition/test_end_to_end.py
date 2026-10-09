@@ -4,7 +4,6 @@ import os
 import time
 import urllib.error
 import urllib.request
-
 import cv2
 
 
@@ -124,9 +123,7 @@ def post_json(path, payload):
         return exc.code, result
 
 
-# ==========================================================
 # 1. ENROLLMENT
-# ==========================================================
 
 print("=" * 60)
 print("ENROLLMENT")
@@ -189,9 +186,7 @@ print(
 )
 
 
-# ==========================================================
 # 2. ATTENDANCE
-# ==========================================================
 
 print()
 print("=" * 60)
