@@ -528,6 +528,7 @@ body { margin: 0; line-height: 1.5; }
   flex: 0 0 auto;
 }
 .login-field > input,
+.login-field > select,
 .login-password-control input {
   width: 100%;
   min-height: 32px;
@@ -541,6 +542,7 @@ body { margin: 0; line-height: 1.5; }
   font-size: 15px;
   font-weight: 500;
 }
+.login-field > select { cursor: pointer; }
 .login-field > input::placeholder,
 .login-password-control input::placeholder { color: #a59b9b; }
 .login-field > input:hover,
@@ -612,44 +614,54 @@ body { margin: 0; line-height: 1.5; }
   box-shadow: 0 5px 12px rgba(122, 12, 12, .25);
   transform: translateY(-1px);
 }
-.scene--auth .sign-in-button:focus-visible,
-.login-password-toggle:focus-visible,
-.login-register-prompt a:focus-visible {
-  outline: 2px solid #8a1111;
-  outline-offset: 3px;
+.register-form .sign-in-button:disabled,
+.register-camera-button:disabled { opacity: .55; cursor: not-allowed; }
+.register-face-capture {
+  margin: 0 0 18px;
+  padding: 14px;
+  border: 1px solid #eadede;
+  border-radius: 8px;
+  background: #fffafa;
 }
-.login-google-button-slot {
-  display: flex;
-  width: 100%;
-  min-height: 40px;
-  justify-content: center;
-  margin-top: 14px;
-}
-.login-google-button--disabled {
-  display: flex;
-  width: 100%;
-  min-height: 50px;
+.register-face-capture h3 { margin: 0; color: #3e3838; font-size: 14px; }
+.register-face-capture p { margin: 5px 0 12px; color: #716969; font-size: 12px; line-height: 1.5; }
+.register-face-capture video { display: block; width: 100%; max-height: 240px; margin-bottom: 10px; border-radius: 6px; object-fit: cover; }
+.register-camera-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.register-camera-button {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin-top: 14px;
-  border: 1px solid #d8d1d1;
-  border-radius: 8px;
-  background: #fff;
-  color: #3c3434;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid #8a1111;
+  border-radius: 6px;
+  background: #8a1111;
+  color: #fff;
   font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  opacity: .7;
-  cursor: not-allowed;
+  font-size: 12px;
+  cursor: pointer;
 }
-.login-google-button--disabled svg { width: 20px; height: 20px; }
-.login-google-status {
-  display: block;
-  margin-top: 6px;
-  color: #716969;
-  font-size: 11px;
-  text-align: center;
+.register-camera-button.secondary { background: #fff; color: #8a1111; }
+.register-frame-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; color: #716969; font-size: 11px; }
+.register-frame-status button { padding: 0; border: 0; background: none; color: #8a1111; font: inherit; font-weight: 600; cursor: pointer; }
+.register-biometric-consent { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 18px; color: #514747; font-size: 12px; line-height: 1.5; }
+.register-biometric-consent input { flex: 0 0 auto; margin: 3px 0 0; accent-color: #8a1111; }
+.register-biometric-consent input:hover { transform: none; box-shadow: none; cursor: pointer; }
+.login-password-links { display: flex; justify-content: flex-end; margin: -8px 0 10px; font-size: 12px; }
+.login-password-links a { color: #861010; font-weight: 600; text-decoration: none; }
+.login-password-links a:hover { text-decoration: underline; }
+.auth-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0 12px; color: #897e7e; font-size: 12px; }
+.auth-divider::before, .auth-divider::after { height: 1px; flex: 1; content: ""; background: #e6dddd; }
+.google-sign-in { display: flex; min-height: 40px; justify-content: center; }
+.google-sign-in iframe { max-width: 100%; }
+.auth-success { margin-bottom: 16px; padding: 10px 12px; border-radius: 8px; background: #eef9f0; color: #236b34; font-size: 13px; }
+.scene--auth .sign-in-button:focus-visible,
+.login-password-toggle:focus-visible,
+.login-register-prompt a:focus-visible,
+.login-password-links a:focus-visible {
+  outline: 2px solid #8a1111;
+  outline-offset: 3px;
 }
 @media (max-width: 760px) {
   .dashboard { padding: 48px 22px; }

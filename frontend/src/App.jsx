@@ -19,6 +19,8 @@ import {
 } from "./pages/AttendancePages";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import { getSession } from "./auth";
 import ButtonAnimation from "./ButtonAnimation";
 import "./index.css";
@@ -43,6 +45,8 @@ const TRANSITION_VARIANTS = {
   "/profile": "profile",
   "/login": "login",
   "/register": "register",
+  "/forgot-password": "login",
+  "/reset-password": "login",
   "/admin/login": "login",
   "/admin": "home",
 };
@@ -114,7 +118,7 @@ function AuthLayout() {
   };
 
   useEffect(() => {
-    if (pathname === "/admin/login") setLamp(true);
+    if (["/admin/login", "/forgot-password", "/reset-password"].includes(pathname)) setLamp(true);
   }, [pathname]);
 
   const setPull = (distance) => {
@@ -210,7 +214,7 @@ function AuthLayout() {
   return (
     <main
       ref={sceneRef}
-      className={`scene ${lampOn ? "light-on" : "light-off"}${pathname === "/login" || pathname === "/register" ? " scene--auth" : ""}`}
+      className={`scene ${lampOn ? "light-on" : "light-off"}${["/login", "/register", "/admin/login", "/forgot-password", "/reset-password"].includes(pathname) ? " scene--auth" : ""}`}
     >
       <section className="lamp-stage" aria-label="Pull-cord lamp">
         <div ref={lampRef} className="lamp" data-dragging="false">
@@ -247,8 +251,8 @@ function AuthLayout() {
         className={`login-container${pathname === "/login" ? " login-container--login" : ""}`}
         aria-hidden={!lampOn}
       >
-        <div className="portal-brand" aria-label="Netra logo">
-          <img className="portal-logo" src="/netra-logo.svg.png" alt="Netra" />
+        <div className="portal-brand" aria-label="Cognis logo">
+          <img className="portal-logo" src="/cognis-wordmark.png" alt="Cognis" />
         </div>
         <h1 className="portal-title">SMART ATTENDANCE PORTAL</h1>
         <div className="page-content auth-route" key={pathname}>
@@ -270,9 +274,11 @@ export default function App() {
           <Route index element={<Navigate to="/login" replace />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
+          <Route path="forgot-password" element={<ForgotPassword />} />
+          <Route path="reset-password" element={<ResetPassword />} />
           <Route path="admin/login" element={<AdminLogin />} />
         </Route>
-        <Route path="admin" element={<Protected role="admin"><AdminDashboard /></Protected>} />
+        <Route path="admin/*" element={<Protected role="admin"><AdminDashboard /></Protected>} />
         <Route element={<Protected role="student"><DashboardLayout /></Protected>}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiArrowRight, FiEye, FiEyeOff, FiLock, FiUser } from "react-icons/fi";
-import { FcGoogle } from "react-icons/fc";
 import { afterButtonAnimation } from "../ButtonAnimation";
 import { loginUser, loginWithGoogle } from "../auth";
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,84 +12,87 @@ export default function Login() {
   const [form, setForm] = useState({ studentId: "", password: "" });
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [googleStatus, setGoogleStatus] = useState("");
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const [busy, setBusy] = useState(false);
+
+  const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      await loginUser(form);
+      afterButtonAnimation(() => navigate("/dashboard"));
+    } catch (err) {
+      setError(err.message || "Student sign-in failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
-    if (!googleClientId) {
-      setGoogleStatus("Google sign-in needs a VITE_GOOGLE_CLIENT_ID configuration.");
-      return undefined;
-    }
-
-    let isActive = true;
-    const renderGoogleButton = () => {
-      if (!isActive || !window.google?.accounts?.id || !googleButtonRef.current) return;
-
-      window.google.accounts.id.initialize({
-        client_id: googleClientId,
+    if (!GOOGLE_CLIENT_ID) return undefined;
+    let isCurrent = true;
+    const initializeGoogleSignIn = () => {
+      if (!isCurrent) return;
+      const identity = window.google?.accounts?.id;
+      if (!identity || !googleButtonRef.current) {
+        setError("Google sign-in could not be initialized. Please use your student number and password.");
+        return;
+      }
+      identity.initialize({
+        client_id: GOOGLE_CLIENT_ID,
         callback: async ({ credential }) => {
-          if (!credential) {
-            setError("Google did not return a sign-in credential. Please try again.");
-            return;
-          }
           setError("");
+          setBusy(true);
           try {
             await loginWithGoogle(credential);
             afterButtonAnimation(() => navigate("/dashboard"));
-          } catch (err) {
-            setError(err.message);
+          } catch (loginError) {
+            setError(loginError.message || "Google sign-in failed. Please try again.");
+          } finally {
+            setBusy(false);
           }
         },
       });
-      window.google.accounts.id.renderButton(googleButtonRef.current, {
-        type: "standard",
+      identity.renderButton(googleButtonRef.current, {
         theme: "outline",
         size: "large",
         text: "continue_with",
         shape: "rectangular",
-        width: Math.min(400, Math.floor(googleButtonRef.current.clientWidth)),
+        width: Math.min(360, googleButtonRef.current.clientWidth),
       });
-      setGoogleStatus("");
-    };
-    const handleLoadError = () => {
-      if (isActive) setGoogleStatus("Unable to load Google sign-in. Check your connection and retry.");
     };
 
     if (window.google?.accounts?.id) {
-      renderGoogleButton();
-    } else {
-      let script = document.getElementById("google-identity-services");
-      if (!script) {
-        script = document.createElement("script");
-        script.id = "google-identity-services";
-        script.src = "https://accounts.google.com/gsi/client";
-        script.async = true;
-        script.defer = true;
-      }
-      script.addEventListener("load", renderGoogleButton);
-      script.addEventListener("error", handleLoadError);
-      if (!script.isConnected) document.head.appendChild(script);
+      initializeGoogleSignIn();
+      return () => { isCurrent = false; };
     }
 
-    return () => {
-      isActive = false;
-      const script = document.getElementById("google-identity-services");
-      script?.removeEventListener("load", renderGoogleButton);
-      script?.removeEventListener("error", handleLoadError);
+    let script = document.querySelector('script[data-google-identity]');
+    const onLoad = () => initializeGoogleSignIn();
+    const onError = () => {
+      if (isCurrent) setError("Google sign-in could not be loaded. Please use your student number and password.");
     };
-  }, [googleClientId, navigate]);
-
-  const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const onSubmit = (e) => {
-    e.preventDefault();
-    try {
-      loginUser(form);
-      afterButtonAnimation(() => navigate("/dashboard"));
-    } catch (err) {
-      setError(err.message);
+    if (!script) {
+      script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.dataset.googleIdentity = "true";
+      script.addEventListener("load", onLoad);
+      script.addEventListener("error", onError);
+      document.head.appendChild(script);
+    } else {
+      script.addEventListener("load", onLoad);
+      script.addEventListener("error", onError);
     }
-  };
+    return () => {
+      isCurrent = false;
+      script?.removeEventListener("load", onLoad);
+      script?.removeEventListener("error", onError);
+    };
+  }, [navigate]);
 
   return (
     <form className="auth-form login-form" onSubmit={onSubmit}>
@@ -150,22 +154,19 @@ export default function Login() {
         </div>
       </div>
 
-      <button type="submit" className="sign-in-button login-submit" data-button-animation>
-        <span>Login</span>
+      <div className="login-password-links"><Link to="/forgot-password">Forgot password?</Link></div>
+
+      <button type="submit" className="sign-in-button login-submit" data-button-animation disabled={busy}>
+        <span>{busy ? "Signing in…" : "Login"}</span>
         <FiArrowRight aria-hidden="true" />
       </button>
 
-      {googleClientId ? (
-        <div className="login-google-button-slot" ref={googleButtonRef} />
-      ) : (
-        <button className="login-google-button--disabled" type="button" disabled>
-          <FcGoogle aria-hidden="true" />
-          <span>Continue with Google</span>
-        </button>
+      {GOOGLE_CLIENT_ID && (
+        <>
+          <div className="auth-divider"><span>or</span></div>
+          <div className="google-sign-in" ref={googleButtonRef} aria-label="Continue with Google" />
+        </>
       )}
-      <small className="login-google-status" id="google-login-status" role="status" aria-live="polite">
-        {googleStatus}
-      </small>
 
       <p className="admin-login-link">
         Site administrator? <Link to="/admin/login">Admin sign in</Link>

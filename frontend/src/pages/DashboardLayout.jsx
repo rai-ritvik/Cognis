@@ -16,7 +16,7 @@ import "./Dashboard.css";
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Home", icon: FiHome },
   { to: "/mark-attendance", label: "Mark attendance", icon: FiMaximize },
-  { to: "/analytics", label: "Analytics", icon: FiBarChart2 },
+  { to: "/analytics", label: "Attendance Analytics", icon: FiBarChart2 },
   { to: "/friends", label: "Friends", icon: FiUsers },
   { to: "/profile", label: "Profile", icon: FiUser },
 ];
@@ -53,8 +53,8 @@ export default function DashboardLayout() {
   return (
     <div className={`dash${isMarkAttendanceRoute ? " mark-attendance-route" : ""}`}>
       <aside className="dash-sidebar">
-        <NavLink className="dash-logo" to="/dashboard" aria-label="Netra home">
-          <img className="dash-logo-image" src="/netra-logo.svg.png" alt="Netra" />
+        <NavLink className="dash-logo" to="/dashboard" aria-label="Cognis home">
+          <img className="dash-logo-image" src="/cognis-wordmark.png" alt="Cognis" />
         </NavLink>
 
         <nav className="dash-nav" aria-label="Dashboard navigation">

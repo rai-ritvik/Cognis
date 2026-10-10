@@ -1,11 +1,11 @@
-// Temporary localStorage auth. Replace the bodies with your real API calls later.
-const USERS_KEY = "sa_users";
 const SESSION_KEY = "sa_session";
 const DEMO_SESSION_KEY = "netra_demo_active_session";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-const DEMO_ADMIN_ENABLED = import.meta.env.DEV;
-const DEMO_ADMIN_EMAIL = "admin@netra.test";
-const DEMO_ADMIN_PASSWORD = "netra-demo";
+const DEMO_ADMIN_ENABLED = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO_MODE === "true";
+const DEMO_ADMIN_EMAIL = "admin@cognis.test";
+const DEMO_ADMIN_PASSWORD = "cognis-demo";
+const LEGACY_DEMO_ADMIN_EMAIL = "admin@netra.test";
+const LEGACY_DEMO_ADMIN_PASSWORD = "netra-demo";
 const DEMO_ATTENDEES = [
   { roll_number: "2512056", name: "Ashutosh", status: "PRESENT", time_logged: "09:02 AM" },
   { roll_number: "2512093", name: "Harsh Tomar", status: "PRESENT", time_logged: "09:04 AM" },
@@ -14,58 +14,53 @@ const DEMO_ATTENDEES = [
   { roll_number: "2500243", name: "Ritvik Rai", status: "PRESENT", time_logged: "09:11 AM" },
 ];
 
-const getUsers = () => JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-const normalizeStudentId = (studentId) => studentId.trim().toLowerCase();
+const saveStudentSession = (result) => {
+  if (!result?.token || result.user?.role !== "student" || !result.user.studentId) {
+    throw new Error("The server returned an invalid student sign-in response.");
+  }
+  localStorage.setItem(SESSION_KEY, JSON.stringify(result.token));
+  return { ...result.user, token: result.token };
+};
 
-export function registerUser({ name, studentId, email, password }) {
-  const users = getUsers();
-  const normalizedStudentId = normalizeStudentId(studentId);
-  if (!normalizedStudentId) {
-    throw new Error("Enter your student number.");
-  }
-  if (users.some((u) => u.studentId && normalizeStudentId(u.studentId) === normalizedStudentId)) {
-    throw new Error("This student number is already registered. Please log in.");
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const existingUser = users.find((u) => u.email?.trim().toLowerCase() === normalizedEmail);
-  if (existingUser && !existingUser.studentId) {
-    if (existingUser.password !== password) {
-      throw new Error("Enter your current password to add your student number.");
-    }
-    const upgradedUser = { ...existingUser, studentId: normalizedStudentId };
-    localStorage.setItem(
-      USERS_KEY,
-      JSON.stringify(users.map((user) => user === existingUser ? upgradedUser : user))
-    );
-    localStorage.setItem(
-      SESSION_KEY,
-      JSON.stringify({ name: upgradedUser.name, studentId: upgradedUser.studentId, email: upgradedUser.email, role: "student" })
-    );
-    return upgradedUser;
-  }
-  if (existingUser) {
-    throw new Error("This email is already registered. Please log in.");
-  }
-
-  const user = { name, studentId: normalizedStudentId, email: normalizedEmail, password };
-  localStorage.setItem(USERS_KEY, JSON.stringify([...users, user]));
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ name, studentId: user.studentId, email: user.email, role: "student" })); // auto login
-  return user;
+if (localStorage.getItem("sa_users")) {
+  localStorage.removeItem("sa_users");
 }
 
-export function loginUser({ studentId, password }) {
-  const loginIdentifier = studentId.trim().toLowerCase();
-  const user = getUsers().find(
-    (u) => (
-      (u.studentId && normalizeStudentId(u.studentId) === loginIdentifier) ||
-      u.email?.trim().toLowerCase() === loginIdentifier
-    ) && u.password === password
-  );
-  if (!user) throw new Error("Incorrect student number or password.");
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ name: user.name, studentId: user.studentId, email: user.email, role: "student" }));
-  return user;
+export async function registerUser(details) {
+  const result = await requestApi("/api/auth/register", {
+    method: "POST",
+    body: details,
+  });
+  return saveStudentSession(result);
 }
+
+export async function loginUser({ studentId, password }) {
+  const result = await requestApi("/api/auth/login", {
+    method: "POST",
+    body: { identifier: studentId, password },
+  });
+  return saveStudentSession(result);
+}
+
+export async function loginWithGoogle(credential) {
+  const result = await requestApi("/api/auth/google", {
+    method: "POST",
+    body: { credential },
+  });
+  return saveStudentSession(result);
+}
+
+export const requestPasswordReset = (identifier) =>
+  requestApi("/api/auth/password/reset-request", {
+    method: "POST",
+    body: { identifier },
+  });
+
+export const completePasswordReset = (accessToken, password) =>
+  requestApi("/api/auth/password/reset", {
+    method: "POST",
+    body: { access_token: accessToken, password },
+  });
 
 async function requestApi(path, { method = "GET", body, token } = {}) {
   const headers = { "Content-Type": "application/json" };
@@ -90,28 +85,24 @@ async function requestApi(path, { method = "GET", body, token } = {}) {
   } catch {
     throw new Error("The attendance server returned an invalid response. Check that the backend is running correctly.");
   }
+  if (response.status === 401 && token) {
+    const session = getSession();
+    if (session?.token === token) localStorage.removeItem(SESSION_KEY);
+  }
   if (!response.ok) throw new Error(result.error || "The request could not be completed.");
   return result;
 }
 
-export async function loginWithGoogle(credential) {
-  const result = await requestApi("/api/auth/google", {
-    method: "POST",
-    body: { credential },
-  });
-  if (!result.user?.email) {
-    throw new Error("The server returned an invalid Google sign-in response.");
-  }
-  const user = { ...result.user, role: "student" };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-  return user;
-}
-
 export async function loginAdmin({ email, password }) {
   if (DEMO_ADMIN_ENABLED) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const isCurrentDemoLogin =
+      normalizedEmail === DEMO_ADMIN_EMAIL && password === DEMO_ADMIN_PASSWORD;
+    const isLegacyDemoLogin =
+      normalizedEmail === LEGACY_DEMO_ADMIN_EMAIL && password === LEGACY_DEMO_ADMIN_PASSWORD;
     if (
-      email.trim().toLowerCase() !== DEMO_ADMIN_EMAIL ||
-      password !== DEMO_ADMIN_PASSWORD
+      !isCurrentDemoLogin &&
+      !isLegacyDemoLogin
     ) {
       throw new Error("Incorrect demo admin email or password.");
     }
@@ -148,6 +139,38 @@ const isDemoAdmin = () => DEMO_ADMIN_ENABLED && getSession()?.demo === true;
 export const getActiveAttendanceSession = () =>
   DEMO_ADMIN_ENABLED ? Promise.resolve(getDemoActiveSession()) : requestApi("/api/sessions/active");
 
+export const checkInForAttendance = (details) =>
+  requestApi("/api/checkin", {
+    method: "POST",
+    body: details,
+    token: getSession()?.token,
+  });
+
+const requestStudentApi = (path, options = {}) => {
+  const session = getSession();
+  if (session?.role !== "student" || !session.token) {
+    throw new Error("Sign in with a student account to continue.");
+  }
+  return requestApi(path, { ...options, token: session.token });
+};
+
+export const getMyHome = () => requestStudentApi("/api/me/home");
+export const getMyAnalytics = () => requestStudentApi("/api/me/analytics");
+export const getMyProfile = () => requestStudentApi("/api/me/profile");
+export const updateMyProfile = (profile) =>
+  requestStudentApi("/api/me/profile", { method: "PATCH", body: profile });
+export const getMyFriends = () => requestStudentApi("/api/me/friends");
+export const sendFriendRequest = (rollNumber) =>
+  requestStudentApi("/api/me/friends", {
+    method: "POST",
+    body: { roll_number: rollNumber },
+  });
+export const respondToFriendRequest = (requestId, status) =>
+  requestStudentApi(`/api/me/friends/requests/${encodeURIComponent(requestId)}`, {
+    method: "PATCH",
+    body: { status },
+  });
+
 export const getAdminActiveAttendanceSession = () => {
   const session = getSession();
   if (session?.role !== "admin" || !session.token) {
@@ -156,6 +179,63 @@ export const getAdminActiveAttendanceSession = () => {
   if (isDemoAdmin()) return Promise.resolve(getDemoActiveSession());
   return requestApi("/api/sessions/active/admin", { token: session.token });
 };
+
+export const getAdminMembers = () => {
+  const session = getSession();
+  if (session?.role !== "admin" || !session.token) {
+    throw new Error("Sign in with an administrator account to view the student directory.");
+  }
+  if (isDemoAdmin()) {
+    return Promise.resolve({
+      members: DEMO_ATTENDEES.map(({ roll_number, name }) => ({
+        roll_number,
+        full_name: name,
+      })),
+    });
+  }
+  return requestApi("/api/members", { token: session.token });
+};
+
+const requestAdminApi = (path, options = {}) => {
+  const session = getSession();
+  if (session?.role !== "admin" || !session.token) {
+    throw new Error("Sign in with an administrator account to continue.");
+  }
+  if (isDemoAdmin()) {
+    throw new Error("This admin workflow requires the backend; demo mode only supports portal controls and sample members.");
+  }
+  return requestApi(path, { ...options, token: session.token });
+};
+
+export const getAdminReviews = () => requestAdminApi("/api/admin/reviews");
+export const reviewAttendance = (attendanceId, decision, reason = "") =>
+  requestAdminApi(`/api/admin/reviews/${encodeURIComponent(attendanceId)}`, {
+    method: "PATCH",
+    body: { decision, reason },
+  });
+export const getAdminFlags = () => requestAdminApi("/api/admin/flags");
+export const setAttendanceFlag = (attendanceId, flagged, reason = "") =>
+  requestAdminApi(`/api/admin/flags/${encodeURIComponent(attendanceId)}`, {
+    method: "PATCH",
+    body: { flagged, reason },
+  });
+export const getAdminAnalytics = () => requestAdminApi("/api/admin/analytics");
+export const getAdminEvents = () => requestAdminApi("/api/admin/events");
+export const createAdminEvent = (event) =>
+  requestAdminApi("/api/admin/events", { method: "POST", body: event });
+export const cancelAdminEvent = (eventId) =>
+  requestAdminApi(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+    method: "PATCH",
+    body: { status: "CANCELLED" },
+  });
+export const getAdminSchedules = () => requestAdminApi("/api/admin/schedules");
+export const createAdminSchedule = (schedule) =>
+  requestAdminApi("/api/admin/schedules", { method: "POST", body: schedule });
+export const cancelAdminSchedule = (scheduleId) =>
+  requestAdminApi(`/api/admin/schedules/${encodeURIComponent(scheduleId)}`, {
+    method: "PATCH",
+    body: { status: "CANCELLED" },
+  });
 
 export const startAttendanceSession = ({ title, latitude, longitude }) => {
   const session = getSession();
@@ -242,5 +322,34 @@ export const getSessionAttendance = (sessionId) => {
   });
 };
 
-export const getSession = () => JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+export const getSession = () => {
+  try {
+    const session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    if (session?.role === "admin" && session.token) return session;
+    if (typeof session === "string") {
+      const payload = session.split(".")[1];
+      if (!payload) return null;
+      const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      const claims = JSON.parse(new TextDecoder().decode(bytes));
+      const profile = claims.user_metadata;
+      if (claims.role === "authenticated" && profile?.roll_number) {
+        return {
+          name: profile.full_name || "Student",
+          studentId: profile.roll_number,
+          email: claims.email || "",
+          domain: profile.domain || "",
+          year: profile.academic_year || "",
+          github: profile.github_handle || "",
+          role: "student",
+          token: session,
+        };
+      }
+      return null;
+    }
+  } catch {
+    localStorage.removeItem(SESSION_KEY);
+  }
+  return null;
+};
 export const logout = () => localStorage.removeItem(SESSION_KEY);

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -16,13 +17,38 @@ import {
   YAxis,
 } from "recharts";
 import { FiAlertCircle, FiCalendar, FiCheckCircle, FiPercent } from "react-icons/fi";
-import { MOCK_ATTENDANCE, MOCK_SUMMARY, fmtShort } from "./Dashboard";
+import { fmtShort } from "./Dashboard";
+import { getMyAnalytics } from "../auth";
 import "./Dashboard.css";
 
 export default function AnalyticsPage() {
-  const present = MOCK_ATTENDANCE.filter((record) => record.status === "Present").length;
-  const absent = MOCK_ATTENDANCE.length - present;
-  const monthlySummary = [...MOCK_ATTENDANCE.reduce((months, record) => {
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isCurrent = true;
+    getMyAnalytics()
+      .then((result) => {
+        if (isCurrent) {
+          setAnalytics(result);
+          setError("");
+        }
+      })
+      .catch((loadError) => {
+        if (isCurrent) setError(loadError.message || "Could not load attendance analytics.");
+      })
+      .finally(() => {
+        if (isCurrent) setLoading(false);
+      });
+    return () => { isCurrent = false; };
+  }, []);
+
+  const attendance = analytics?.attendance || [];
+  const summary = analytics?.summary || { attendedClasses: 0, totalClasses: 0 };
+  const present = attendance.filter((record) => record.status === "Present").length;
+  const absent = attendance.length - present;
+  const monthlySummary = [...attendance.reduce((months, record) => {
     const month = record.date.slice(0, 7);
     const summary = months.get(month) || { month, present: 0, total: 0 };
     summary.total += 1;
@@ -39,15 +65,15 @@ export default function AnalyticsPage() {
         year: "numeric",
       })
     : "No sessions yet";
-  const latestMissed = [...MOCK_ATTENDANCE]
+  const latestMissed = [...attendance]
     .filter((record) => record.status === "Absent")
     .sort((a, b) => b.date.localeCompare(a.date))[0];
   const latestMissedDay = latestMissed
-    ? MOCK_ATTENDANCE.filter(
+    ? attendance.filter(
         (record) => record.status === "Absent" && record.date === latestMissed.date,
       )
     : [];
-  const sessionTrend = [...MOCK_ATTENDANCE]
+  const sessionTrend = [...attendance]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((record) => ({
       date: new Date(`${record.date}T00:00:00`).toLocaleDateString("en-GB", {
@@ -57,7 +83,7 @@ export default function AnalyticsPage() {
       attendance: record.status === "Present" ? 100 : 0,
       session: record.event,
     }));
-  const dailyCounts = [...MOCK_ATTENDANCE.reduce((days, record) => {
+  const dailyCounts = [...attendance.reduce((days, record) => {
     const date = new Date(`${record.date}T00:00:00`);
     const day = days.get(record.date) || {
       date: date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
@@ -72,17 +98,19 @@ export default function AnalyticsPage() {
     { name: "Present", value: present, color: "#34845b" },
     { name: "Absent", value: absent, color: "#bd5148" },
   ];
-  const attendanceRate = Math.round(
-    (MOCK_SUMMARY.attendedClasses / MOCK_SUMMARY.totalClasses) * 100,
-  );
+  const attendanceRate = summary.totalClasses
+    ? Math.round((summary.attendedClasses / summary.totalClasses) * 100)
+    : 0;
 
   return (
     <div className="dash-page-view subpage-view">
       <header className="subpage-heading">
         <p className="dash-eyebrow">YOUR PROGRESS</p>
-        <h1>Attendance analytics</h1>
+        <h1>Attendance Analytics</h1>
         <p>Explore recent trends and session outcomes.</p>
       </header>
+      {error && <div className="attendance-checkin-message is-error" role="alert">{error}</div>}
+      {loading && <p className="empty" role="status">Loading your attendance analytics…</p>}
 
       <section className="analytics-stats">
         <article className="analytics-overview-card monthly-overview">
@@ -115,9 +143,9 @@ export default function AnalyticsPage() {
             <div><p className="dash-eyebrow">ATTENDANCE SUMMARY</p><h2>Overall progress</h2></div>
           </div>
           <div className="summary-counts">
-            <div><span>Present</span><strong>{MOCK_SUMMARY.attendedClasses}</strong></div>
-            <div><span>Absent</span><strong>{MOCK_SUMMARY.totalClasses - MOCK_SUMMARY.attendedClasses}</strong></div>
-            <div><span>Total sessions</span><strong>{MOCK_SUMMARY.totalClasses}</strong></div>
+            <div><span>Present</span><strong>{summary.attendedClasses}</strong></div>
+            <div><span>Absent</span><strong>{summary.totalClasses - summary.attendedClasses}</strong></div>
+            <div><span>Total sessions</span><strong>{summary.totalClasses}</strong></div>
           </div>
         </article>
 
@@ -140,7 +168,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
           <p className="overview-card-footnote">
-            {MOCK_SUMMARY.attendedClasses} of {MOCK_SUMMARY.totalClasses} classes attended
+            {summary.attendedClasses} of {summary.totalClasses} classes attended
           </p>
         </article>
 
@@ -190,13 +218,13 @@ export default function AnalyticsPage() {
 
         <article className="panel analytics-panel distribution-panel">
           <div className="chart-heading"><div><p className="dash-eyebrow">DISTRIBUTION</p><h2 className="panel-title">Present vs absent</h2></div></div>
-          <p className="chart-caption">Recent sample of {MOCK_ATTENDANCE.length} sessions</p>
+          <p className="chart-caption">Based on {attendance.length} recorded sessions</p>
           <div className="chart-canvas distribution-canvas">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={distribution} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="82%" paddingAngle={4} stroke="none">
                   {distribution.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
-                  <Label value={`${Math.round((present / MOCK_ATTENDANCE.length) * 100)}%`} position="center" className="donut-label" />
+                  <Label value={`${attendance.length ? Math.round((present / attendance.length) * 100) : 0}%`} position="center" className="donut-label" />
                 </Pie>
                 <Tooltip formatter={(value, name) => [`${value} sessions`, name]} />
                 <Legend verticalAlign="bottom" height={28} iconType="circle" wrapperStyle={{ fontSize: 11 }} />
@@ -225,13 +253,14 @@ export default function AnalyticsPage() {
       </section>
 
       <section className="panel analytics-records">
-        <div className="chart-heading"><div><p className="dash-eyebrow">SOURCE RECORDS</p><h2 className="panel-title">Recent sessions</h2></div><span className="data-note">Sample data</span></div>
-        {MOCK_ATTENDANCE.map((record) => (
+        <div className="chart-heading"><div><p className="dash-eyebrow">SOURCE RECORDS</p><h2 className="panel-title">Recent sessions</h2></div><span className="data-note">Live data</span></div>
+        {attendance.map((record) => (
           <div className="attendance-row" key={record.id}>
             <div className="attendance-event"><strong>{record.event}</strong><span>{fmtShort(record.date)}</span></div>
             <em className={`badge ${record.status.toLowerCase()}`}>{record.status}</em>
           </div>
         ))}
+        {!loading && attendance.length === 0 && <p className="empty">No attendance sessions have been recorded yet.</p>}
       </section>
     </div>
   );
