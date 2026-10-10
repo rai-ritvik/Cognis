@@ -4,8 +4,8 @@ import { FiArrowRight, FiLock, FiMail } from "react-icons/fi";
 import { afterButtonAnimation } from "../ButtonAnimation";
 import { loginAdmin } from "../auth";
 
-const DEMO_CREDENTIALS = import.meta.env.DEV
-  ? { email: "admin@netra.test", password: "netra-demo" }
+const DEMO_CREDENTIALS = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO_MODE === "true"
+  ? { email: "admin@cognis.test", password: "cognis-demo" }
   : null;
 
 export default function AdminLogin() {

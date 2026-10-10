@@ -230,7 +230,7 @@ export default function AttendanceWelcome({
       </div>}
 
       {isOpen && (
-        <div className="welcome-animation" role="dialog" aria-modal="true" aria-label={issueMode ? "Attendance issue details" : "Netra attendance check-in preview"}>
+        <div className="welcome-animation" role="dialog" aria-modal="true" aria-label={issueMode ? "Attendance issue details" : "Cognis attendance check-in preview"}>
           <div className="welcome-animation__grid" aria-hidden="true" />
           <div className="welcome-animation__orb welcome-animation__orb--one" aria-hidden="true" />
           <div className="welcome-animation__orb welcome-animation__orb--two" aria-hidden="true" />
@@ -252,7 +252,7 @@ export default function AttendanceWelcome({
                 <circle className="pupil" cx="60" cy="40" r="8" />
               </svg>
               <h2>Welcome, <span>{studentName || "Student"}</span></h2>
-              <p>{issueMode ? "Let’s look at a few things that can interrupt check-in." : "Here&apos;s a quick look at checking in with Netra."}</p>
+              <p>{issueMode ? "Let’s look at a few things that can interrupt check-in." : "Here&apos;s a quick look at checking in with Cognis."}</p>
             </section>
           ) : (
             <section className={`welcome-animation__flow step-${step}`} key={step}>

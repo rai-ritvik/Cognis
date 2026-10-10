@@ -1,27 +1,33 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   FiAlertCircle,
+  FiBarChart2,
   FiCalendar,
   FiCheckCircle,
+  FiClipboard,
   FiClock,
+  FiFlag,
   FiInfo,
   FiLogOut,
   FiMapPin,
   FiPower,
   FiRefreshCw,
+  FiSearch,
   FiShield,
   FiUsers,
 } from "react-icons/fi";
 import {
   endAttendanceSession,
   getAdminActiveAttendanceSession,
+  getAdminMembers,
   getSession,
   getSessionAttendance,
   logout,
   rotateAttendanceRoomToken,
   startAttendanceSession,
 } from "../auth";
+import AdminWorkflows from "./AdminWorkflows";
 import "./AdminDashboard.css";
 
 const getCoordinates = () =>
@@ -44,6 +50,10 @@ const getCoordinates = () =>
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const adminPath = location.pathname.replace(/\/+$/, "") || "/";
+  const isMembersPage = adminPath === "/admin/members";
+  const isWorkflowPage = adminPath !== "/admin" && !isMembersPage;
   const user = getSession();
   const isDemo = user?.demo === true;
   const [title, setTitle] = useState("");
@@ -56,6 +66,10 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
   const [locationBusy, setLocationBusy] = useState(false);
+  const [members, setMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
   const [now, setNow] = useState(new Date());
 
   const refresh = useCallback(async () => {
@@ -86,6 +100,31 @@ export default function AdminDashboard() {
       window.clearInterval(clockTimer);
     };
   }, [refresh]);
+
+  useEffect(() => {
+    if (!isMembersPage) return undefined;
+
+    let isCurrent = true;
+    setMembersLoading(true);
+    setMembersError("");
+    getAdminMembers()
+      .then((result) => {
+        if (!Array.isArray(result.members)) {
+          throw new Error("The server returned an invalid student directory.");
+        }
+        if (isCurrent) setMembers(result.members);
+      })
+      .catch((membersError) => {
+        if (isCurrent) setMembersError(membersError.message || "Could not load the student directory.");
+      })
+      .finally(() => {
+        if (isCurrent) setMembersLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isMembersPage]);
 
   const handleLogout = () => {
     logout();
@@ -176,20 +215,45 @@ export default function AdminDashboard() {
     hour: "2-digit",
     minute: "2-digit",
   });
+  const filteredMembers = members.filter((member) => {
+    const query = memberSearch.trim().toLowerCase();
+    return !query || [member.full_name, member.roll_number, member.domain, member.github_handle]
+      .some((value) => value?.toLowerCase().includes(query));
+  });
 
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
-        <a className="admin-logo" href="/admin" aria-label="Netra admin home">
-          <img src="/netra-logo.svg.png" alt="Netra" />
+        <a className="admin-logo" href="/admin" aria-label="Cognis admin home">
+          <img src="/cognis-wordmark.png" alt="Cognis" />
         </a>
         <div className="admin-side-label">ADMINISTRATION</div>
-        <div className="admin-nav-item active"><FiShield aria-hidden="true" /><span>Portal control</span></div>
+        <NavLink aria-label="Portal control" className={({ isActive }) => `admin-nav-item${isActive ? " active" : ""}`} to="/admin" end>
+          <FiShield aria-hidden="true" /><span>Portal control</span>
+        </NavLink>
+        <NavLink aria-label="Members" className={({ isActive }) => `admin-nav-item${isActive ? " active" : ""}`} to="/admin/members">
+          <FiUsers aria-hidden="true" /><span>Members</span>
+        </NavLink>
+        <NavLink aria-label="Review queue" className={({ isActive }) => `admin-nav-item${isActive ? " active" : ""}`} to="/admin/review">
+          <FiClipboard aria-hidden="true" /><span>Review queue</span>
+        </NavLink>
+        <NavLink aria-label="Flags" className={({ isActive }) => `admin-nav-item${isActive ? " active" : ""}`} to="/admin/flags">
+          <FiFlag aria-hidden="true" /><span>Flags</span>
+        </NavLink>
+        <NavLink aria-label="Analytics" className={({ isActive }) => `admin-nav-item${isActive ? " active" : ""}`} to="/admin/analytics">
+          <FiBarChart2 aria-hidden="true" /><span>Analytics</span>
+        </NavLink>
+        <NavLink aria-label="Events" className={({ isActive }) => `admin-nav-item${isActive ? " active" : ""}`} to="/admin/events">
+          <FiCalendar aria-hidden="true" /><span>Events</span>
+        </NavLink>
+        <NavLink aria-label="Schedule session" className={({ isActive }) => `admin-nav-item${isActive ? " active" : ""}`} to="/admin/schedule">
+          <FiClock aria-hidden="true" /><span>Schedule session</span>
+        </NavLink>
         <div className="admin-sidebar-note">
           <span className={`admin-sidebar-status${activeSession ? " is-open" : ""}`} />
           <span>{activeSession ? "Attendance is open" : "Portal is closed"}</span>
         </div>
-        <button className="admin-logout" type="button" onClick={handleLogout}>
+        <button aria-label="Log out" className="admin-logout" type="button" onClick={handleLogout}>
           <FiLogOut aria-hidden="true" /><span>Log out</span>
         </button>
       </aside>
@@ -206,6 +270,62 @@ export default function AdminDashboard() {
           </div>
         </header>
 
+        {isWorkflowPage ? (
+          <AdminWorkflows pathname={adminPath} />
+        ) : isMembersPage ? (
+          <section className="admin-members-view">
+            <div className="admin-members-heading">
+              <div>
+                <p className="admin-eyebrow">STUDENT DIRECTORY</p>
+                <h1>Members</h1>
+                <p>{isDemo
+                  ? "Demo mode shows sample students; session check-ins remain on Portal control."
+                  : "Browse all registered students. Session check-ins remain on Portal control."}</p>
+              </div>
+              <span className="admin-attendee-count">{members.length}</span>
+            </div>
+
+            <label className="admin-members-search">
+              <FiSearch aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="Search by name, student number, domain, or GitHub"
+                aria-label="Search students"
+                value={memberSearch}
+                onChange={(event) => setMemberSearch(event.target.value)}
+              />
+            </label>
+
+            {membersError && <div className="admin-feedback is-error" role="alert"><FiAlertCircle aria-hidden="true" />{membersError}</div>}
+            {membersLoading ? (
+              <div className="admin-empty-state" role="status"><p>Loading student directory…</p></div>
+            ) : filteredMembers.length === 0 ? (
+              <div className="admin-empty-state">
+                <FiUsers aria-hidden="true" />
+                <p>{members.length ? "No students match your search." : "No students are registered yet."}</p>
+              </div>
+            ) : (
+              <div className="admin-members-table-wrap">
+                <table className="admin-members-table">
+                  <thead>
+                    <tr><th scope="col">Student</th><th scope="col">Student number</th><th scope="col">Domain</th><th scope="col">GitHub</th></tr>
+                  </thead>
+                  <tbody>
+                    {filteredMembers.map((member, index) => (
+                      <tr key={member.id || member.roll_number || `${member.full_name}-${index}`}>
+                        <td>{member.full_name || "Unnamed student"}</td>
+                        <td>{member.roll_number || "—"}</td>
+                        <td>{member.domain || "—"}</td>
+                        <td>{member.github_handle || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        ) : (
+          <>
         <section className="admin-welcome">
           <div>
             <p className="admin-eyebrow">ATTENDANCE MANAGEMENT</p>
@@ -342,6 +462,8 @@ export default function AdminDashboard() {
             )}
           </section>
         </div>
+          </>
+        )}
       </main>
     </div>
   );
