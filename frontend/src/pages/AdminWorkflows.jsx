@@ -8,9 +8,11 @@ import {
   getAdminEvents,
   getAdminFlags,
   getAdminReviews,
-  getAdminSchedules,
+   getAdminSchedules,
+  flagStudent,
   reviewAttendance,
   setAttendanceFlag,
+  startScheduledSession,
 } from "../auth";
 
 function WorkflowPage({ eyebrow, title, description, error, notice, children }) {
@@ -80,8 +82,7 @@ function ReviewQueuePage() {
     setError("");
     setNotice("");
     try {
-      const result = await setAttendanceFlag(review.id, true, reason);
-      setNotice(result.message);
+    const result = await flagStudent(review.student?.roll_number, reason); setNotice(result.message);
       await refresh();
     } catch (actionError) {
       setError(actionError.message || "Could not flag this attendance.");
@@ -267,8 +268,7 @@ function SchedulePage() {
         latitude: Number(form.latitude),
         longitude: Number(form.longitude),
       });
-      setNotice(`Scheduled ${result.schedule.title}. It will open automatically when its start time arrives.`);
-      setForm({ title: "", scheduledAt: "", latitude: "", longitude: "" });
+    setNotice(`Scheduled ${result.schedule.title}. Press "Start now" on it when class begins.`); setForm({ title: "", scheduledAt: "", latitude: "", longitude: "" });
       await refresh();
     } catch (actionError) {
       setError(actionError.message || "Could not schedule the session.");
@@ -289,9 +289,22 @@ function SchedulePage() {
       setBusy(false);
     }
   };
+  const startNow = async (scheduleId) => {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await startScheduledSession(scheduleId);
+      setNotice(`Session opened. Room code: ${result.room_token}. Manage it from the Attendance page.`);
+      await refresh();
+    } catch (actionError) {
+      setError(actionError.message || "Could not start the scheduled session.");
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <WorkflowPage eyebrow="ATTENDANCE MANAGEMENT" title="Schedule session" description="Set a future start time and class location. Scheduled sessions open automatically when no other session is active." error={error} notice={notice}>
-      <form className="admin-workflow-form admin-schedule-form" onSubmit={submit}>
+    <WorkflowPage eyebrow="ATTENDANCE MANAGEMENT" title="Schedule session" description="Set a future start time and class location. When class begins, press Start now to open the session (only one session can be open at a time)." error={error} notice={notice}> <form className="admin-workflow-form admin-schedule-form" onSubmit={submit}>
         <label>Session title<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} maxLength={120} required /></label>
         <label>Starts at<input type="datetime-local" value={form.scheduledAt} onChange={(event) => setForm({ ...form, scheduledAt: event.target.value })} required /></label>
         <label>Latitude<input type="number" min="-90" max="90" step="any" value={form.latitude} onChange={(event) => setForm({ ...form, latitude: event.target.value })} required /></label>
@@ -302,8 +315,13 @@ function SchedulePage() {
       {loading ? <p className="admin-empty-state" role="status">Loading schedules…</p> : data.schedules.length === 0 ? <p className="admin-empty-state">No scheduled sessions.</p> : data.schedules.map((schedule) => (
         <article className="admin-workflow-card admin-event-row" key={schedule.id}>
           <div><h2>{schedule.title}</h2><p>{new Date(schedule.scheduled_at).toLocaleString()} · {schedule.status}</p></div>
-          {schedule.status === "PENDING" && <button className="admin-workflow-button secondary" type="button" onClick={() => cancel(schedule.id)} disabled={busy}>Cancel</button>}
-        </article>
+                    {schedule.status === "PENDING" && (
+            <div className="admin-workflow-actions">
+              <button className="admin-workflow-button" type="button" onClick={() => startNow(schedule.id)} disabled={busy}>Start now</button>
+              <button className="admin-workflow-button secondary" type="button" onClick={() => cancel(schedule.id)} disabled={busy}>Cancel</button>
+            </div>
+          )}
+           </article>
       ))}
     </WorkflowPage>
   );

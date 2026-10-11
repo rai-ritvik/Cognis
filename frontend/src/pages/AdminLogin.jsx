@@ -41,13 +41,13 @@ export default function AdminLogin() {
       {error && <div className="error" role="alert">{error}</div>}
 
       <div className={`login-field${form.email ? " has-value" : ""}`}>
-        <label htmlFor="admin-email"><FiMail aria-hidden="true" /><span>Admin email</span></label>
+                <label htmlFor="admin-email"><FiMail aria-hidden="true" /><span>Admin student number</span></label>
         <input
           id="admin-email"
           name="email"
-          type="email"
+          type="text"
           autoComplete="username"
-          placeholder="Enter your admin email"
+          placeholder="Enter your admin student number"
           required
           value={form.email}
           onChange={(event) => setForm({ ...form, email: event.target.value })}
@@ -78,8 +78,11 @@ export default function AdminLogin() {
           <br />Demo access is available only while running the development server.
         </p>
       ) : (
-        <p className="admin-login-note">Admin accounts are provisioned by the site owner.</p>
+               <p className="admin-login-note">Admins sign in with their student number. An admin is a registered member whose role was set to admin in the database.</p>
       )}
     </form>
   );
 }
+
+
+ 
