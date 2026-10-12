@@ -104,7 +104,7 @@ export default function Register() {
         consent: form.consent,
         baseline_frames_base64: frames,
       });
-      afterButtonAnimation(() => navigate("/dashboard"));
+      afterButtonAnimation(() => navigate("/login", { state: { registrationComplete: true } }));
     } catch (registrationError) {
       setError(registrationError.message || "Registration failed. Please try again.");
       setIsSubmitting(false);

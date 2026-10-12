@@ -253,7 +253,7 @@ export function MarkAttendancePage() {
         room_token: roomToken.trim(),
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
-        live_frames_base64: capturedFrames,
+        frames: capturedFrames,
         blink_prompt_frame_index: blinkPromptFrameIndex,
       });
       if (result.status !== "PRESENT") {

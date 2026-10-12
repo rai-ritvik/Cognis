@@ -1,7 +1,7 @@
 const SESSION_KEY = "sa_session";
 const DEMO_SESSION_KEY = "netra_demo_active_session";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-const DEMO_ADMIN_ENABLED = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO_MODE === "true";
+const DEMO_ADMIN_ENABLED = false;
 const DEMO_ADMIN_EMAIL = "admin@cognis.test";
 const DEMO_ADMIN_PASSWORD = "cognis-demo";
 const LEGACY_DEMO_ADMIN_EMAIL = "admin@netra.test";
@@ -15,11 +15,14 @@ const DEMO_ATTENDEES = [
 ];
 
 const saveStudentSession = (result) => {
-  if (!result?.token || result.user?.role !== "student" || !result.user.studentId) {
+  const rawUser = result?.user || result?.member;
+  const studentId = rawUser?.studentId || rawUser?.roll_number;
+  if (!result?.token || !rawUser || !studentId) {
     throw new Error("The server returned an invalid student sign-in response.");
   }
-  localStorage.setItem(SESSION_KEY, JSON.stringify(result.token));
-  return { ...result.user, token: result.token };
+  const user = { ...rawUser, studentId, name: rawUser.name || rawUser.full_name, role: rawUser.role || "student", token: result.token };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  return user;
 };
 
 if (localStorage.getItem("sa_users")) {
@@ -29,37 +32,33 @@ if (localStorage.getItem("sa_users")) {
 export async function registerUser(details) {
   const result = await requestApi("/api/auth/register", {
     method: "POST",
-    body: details,
+    body: { ...details, year: details.year ?? details.academic_year, frames: details.frames ?? details.baseline_frames_base64 },
   });
-  return saveStudentSession(result);
+  return result;
 }
 
 export async function loginUser({ studentId, password }) {
   const result = await requestApi("/api/auth/login", {
     method: "POST",
-    body: { identifier: studentId, password },
+    body: { roll_number: studentId, password },
   });
   return saveStudentSession(result);
 }
 
-export async function loginWithGoogle(credential) {
-  const result = await requestApi("/api/auth/google", {
-    method: "POST",
-    body: { credential },
-  });
-  return saveStudentSession(result);
+export async function loginWithGoogle() {
+  throw new Error("Google sign-in is not available yet. Please use your student number and password.");
 }
 
 export const requestPasswordReset = (identifier) =>
-  requestApi("/api/auth/password/reset-request", {
+  requestApi("/api/auth/forgot", {
     method: "POST",
     body: { identifier },
   });
 
 export const completePasswordReset = (accessToken, password) =>
-  requestApi("/api/auth/password/reset", {
+  requestApi("/api/auth/reset-password", {
     method: "POST",
-    body: { access_token: accessToken, password },
+    body: { token: accessToken, password },
   });
 
 async function requestApi(path, { method = "GET", body, token } = {}) {
@@ -117,7 +116,7 @@ export async function loginAdmin({ email, password }) {
     return demoUser;
   }
 
-  const result = await requestApi("/api/auth/admin/login", {
+  const result = await requestApi("/api/auth/login", {
     method: "POST",
     body: { email, password },
   });
@@ -140,7 +139,7 @@ export const getActiveAttendanceSession = () =>
   DEMO_ADMIN_ENABLED ? Promise.resolve(getDemoActiveSession()) : requestApi("/api/sessions/active");
 
 export const checkInForAttendance = (details) =>
-  requestApi("/api/checkin", {
+  requestApi("/api/attendance/checkin", {
     method: "POST",
     body: details,
     token: getSession()?.token,
@@ -193,7 +192,7 @@ export const getAdminMembers = () => {
       })),
     });
   }
-  return requestApi("/api/members", { token: session.token });
+  return requestApi("/api/admin/members", { token: session.token });
 };
 
 const requestAdminApi = (path, options = {}) => {
@@ -209,7 +208,7 @@ const requestAdminApi = (path, options = {}) => {
 
 export const getAdminReviews = () => requestAdminApi("/api/admin/reviews");
 export const reviewAttendance = (attendanceId, decision, reason = "") =>
-  requestAdminApi(`/api/admin/reviews/${encodeURIComponent(attendanceId)}`, {
+  requestAdminApi(`/api/admin/alerts/${encodeURIComponent(attendanceId)}/review`, {
     method: "PATCH",
     body: { decision, reason },
   });
@@ -325,7 +324,7 @@ export const getSessionAttendance = (sessionId) => {
 export const getSession = () => {
   try {
     const session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
-    if (session?.role === "admin" && session.token) return session;
+    if (session && typeof session === "object" && session.token && ["admin", "student"].includes(session.role)) return session;
     if (typeof session === "string") {
       const payload = session.split(".")[1];
       if (!payload) return null;
