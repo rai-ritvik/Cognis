@@ -24,7 +24,13 @@ function toAppError(error) {
   if (error.response) {
     const status = error.response.status;
     if (status === 400 || status === 413 || status === 422) {
-      // Do not expose detailed image/model diagnostics to every caller.
+      // Log only the ML API's sanitized error details. Never log frame data, credentials,
+      // or the request body. This makes diagnosis possible without exposing biometrics.
+      const responseDetail = error.response.data?.detail || error.response.data;
+      console.error('[ml1] input rejected:', JSON.stringify({
+        status,
+        detail: responseDetail,
+      }));
       return new AppError(422, 'The ML service could not process these frames. Capture clear, supported camera frames and try again.', 'ML_INVALID_INPUT');
     }
     if (status === 401 || status === 403) {
