@@ -20,7 +20,7 @@ const saveStudentSession = (result) => {
   if (!result?.token || !rawUser || !studentId) {
     throw new Error("The server returned an invalid student sign-in response.");
   }
-  const user = { ...rawUser, studentId, name: rawUser.name || rawUser.full_name, role: rawUser.role || "student", token: result.token };
+  const user = { ...rawUser, studentId, name: rawUser.name || rawUser.full_name, role: rawUser.role === "admin" ? "admin" : "student", token: result.token };
   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   return user;
 };
@@ -155,9 +155,42 @@ const requestStudentApi = (path, options = {}) => {
 
 export const getMyHome = () => requestStudentApi("/api/me/home");
 export const getMyAnalytics = () => requestStudentApi("/api/me/analytics");
-export const getMyProfile = () => requestStudentApi("/api/me/profile");
+
+const normalizeProfileResponse = (result) => {
+  const member = result?.profile || result?.member;
+
+  // If the server didn't return profile data, don't crash.
+  if (!member) {
+    throw new Error("The server did not return profile information.");
+  }
+
+  return {
+    ...result,
+    profile: {
+      ...member,
+      year: member.year || member.academic_year || "",
+      domain: member.domain || "",
+      github: member.github || member.github_handle || "",
+      linkedin: member.linkedin || member.linkedin_url || "",
+      instagram: member.instagram || member.instagram_url || "",
+      about: member.about || member.bio || "",
+      skills: Array.isArray(member.skills)
+        ? member.skills.join(", ")
+        : member.skills || "",
+      photo: member.photo || member.profile_photo_url || "",
+    },
+  };
+};
+
+export const getMyProfile = () =>
+  requestStudentApi("/api/me/profile").then(normalizeProfileResponse);
+
 export const updateMyProfile = (profile) =>
-  requestStudentApi("/api/me/profile", { method: "PATCH", body: profile });
+  requestStudentApi("/api/me/profile", {
+    method: "PATCH",
+    body: profile,
+  }).then(normalizeProfileResponse);
+
 export const getMyFriends = () => requestStudentApi("/api/me/friends");
 export const sendFriendRequest = (rollNumber) =>
   requestStudentApi("/api/me/friends", {
