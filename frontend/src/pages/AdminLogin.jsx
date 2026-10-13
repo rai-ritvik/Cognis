@@ -1,16 +1,12 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { FiArrowRight, FiLock, FiMail } from "react-icons/fi";
-import { afterButtonAnimation } from "../ButtonAnimation";
-import { loginAdmin } from "../auth";
-
-const DEMO_CREDENTIALS = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO_MODE === "true"
-  ? { email: "admin@cognis.test", password: "cognis-demo" }
-  : null;
+import {useState} from "react";
+import {Link, useNavigate} from "react-router-dom";
+import {FiArrowRight, FiHash, FiLock} from "react-icons/fi";
+import {afterButtonAnimation} from "../ButtonAnimation";
+import {loginAdmin} from "../auth";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({rollNumber: "", password: ""});
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -18,6 +14,7 @@ export default function AdminLogin() {
     event.preventDefault();
     setError("");
     setIsSubmitting(true);
+
     try {
       await loginAdmin(form);
       afterButtonAnimation(() => navigate("/admin"));
@@ -36,50 +33,66 @@ export default function AdminLogin() {
       </div>
 
       <h2>Admin sign in</h2>
-      <p className="login-copy">Sign in to manage the attendance portal.</p>
+      <p className="login-copy">
+        Sign in using your administrator student number and password.
+      </p>
 
-      {error && <div className="error" role="alert">{error}</div>}
+      {error && (
+        <div className="error" role="alert">
+          {error}
+        </div>
+      )}
 
-      <div className={`login-field${form.email ? " has-value" : ""}`}>
-        <label htmlFor="admin-email"><FiMail aria-hidden="true" /><span>Admin email</span></label>
+      <div className={`login-field${form.rollNumber ? " has-value" : ""}`}>
+        <label htmlFor="admin-roll-number">
+          <FiHash aria-hidden="true" />
+          <span>Student Number</span>
+        </label>
         <input
-          id="admin-email"
-          name="email"
-          type="email"
+          id="admin-roll-number"
+          name="rollNumber"
+          type="text"
+          inputMode="numeric"
           autoComplete="username"
-          placeholder="Enter your admin email"
+          placeholder="Enter your student number"
           required
-          value={form.email}
-          onChange={(event) => setForm({ ...form, email: event.target.value })}
+          value={form.rollNumber}
+          onChange={(event) =>
+            setForm({...form, rollNumber: event.target.value})
+          }
         />
       </div>
 
       <div className={`login-field${form.password ? " has-value" : ""}`}>
-        <label htmlFor="admin-password"><FiLock aria-hidden="true" /><span>Password</span></label>
+        <label htmlFor="admin-password">
+          <FiLock aria-hidden="true" />
+          <span>Password</span>
+        </label>
         <input
           id="admin-password"
           name="password"
           type="password"
           autoComplete="current-password"
-          placeholder="Enter your admin password"
+          placeholder="Enter your password"
           required
           value={form.password}
-          onChange={(event) => setForm({ ...form, password: event.target.value })}
+          onChange={(event) => setForm({...form, password: event.target.value})}
         />
       </div>
 
-      <button type="submit" className="sign-in-button login-submit" disabled={isSubmitting} data-button-animation>
+      <button
+        type="submit"
+        className="sign-in-button login-submit"
+        disabled={isSubmitting}
+        data-button-animation
+      >
         <span>{isSubmitting ? "Signing in…" : "Sign in as admin"}</span>
         <FiArrowRight aria-hidden="true" />
       </button>
-      {DEMO_CREDENTIALS ? (
-        <p className="admin-login-note">
-          Development demo: <strong>{DEMO_CREDENTIALS.email}</strong> / <strong>{DEMO_CREDENTIALS.password}</strong>
-          <br />Demo access is available only while running the development server.
-        </p>
-      ) : (
-        <p className="admin-login-note">Admin accounts are provisioned by the site owner.</p>
-      )}
+
+      <p className="admin-login-note">
+        Use an administrator account provisioned by the site owner.
+      </p>
     </form>
   );
 }

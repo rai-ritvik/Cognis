@@ -92,39 +92,34 @@ async function requestApi(path, { method = "GET", body, token } = {}) {
   return result;
 }
 
-export async function loginAdmin({ email, password }) {
-  if (DEMO_ADMIN_ENABLED) {
-    const normalizedEmail = email.trim().toLowerCase();
-    const isCurrentDemoLogin =
-      normalizedEmail === DEMO_ADMIN_EMAIL && password === DEMO_ADMIN_PASSWORD;
-    const isLegacyDemoLogin =
-      normalizedEmail === LEGACY_DEMO_ADMIN_EMAIL && password === LEGACY_DEMO_ADMIN_PASSWORD;
-    if (
-      !isCurrentDemoLogin &&
-      !isLegacyDemoLogin
-    ) {
-      throw new Error("Incorrect demo admin email or password.");
-    }
-    const demoUser = {
-      name: "Demo Administrator",
-      email: DEMO_ADMIN_EMAIL,
-      role: "admin",
-      token: "development-demo-token",
-      demo: true,
-    };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(demoUser));
-    return demoUser;
-  }
 
+export async function loginAdmin({ rollNumber, password }) {
   const result = await requestApi("/api/auth/login", {
     method: "POST",
-    body: { email, password },
+    body: {
+      roll_number: rollNumber.trim(),
+      password,
+    },
   });
-  if (!result.token || result.user?.role !== "admin") {
-    throw new Error("The server returned an invalid admin sign-in response.");
+
+  // The backend returns the account as "member", not "user".
+  const member = result.member || result.user;
+
+  if (!result.token || !member || member.role !== "admin") {
+    throw new Error(
+      "Admin login failed. Check your student number, password, and administrator permissions."
+    );
   }
-  const user = { ...result.user, token: result.token };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+
+  const user = {
+    ...member,
+    studentId: member.roll_number || rollNumber.trim(),
+    name: member.full_name || member.name || "Administrator",
+    role: member.role,
+    token: result.token,
+  };
+
+  localStorage.setItem("sa_session", JSON.stringify(user));
   return user;
 }
 
