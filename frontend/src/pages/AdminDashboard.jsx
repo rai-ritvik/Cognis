@@ -205,6 +205,23 @@ export default function AdminDashboard() {
     }
   };
 
+  
+  useEffect(() => {
+    if (!activeSession?.id) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const result = await rotateAttendanceRoomToken(activeSession.id);
+        setRoomToken(result.new_room_token);
+      } catch (rotateError) {
+        console.error("Automatic room-code rotation failed:", rotateError);
+      }
+    }, 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [activeSession?.id]);
+
+
   const formattedDate = now.toLocaleDateString("en-GB", {
     weekday: "short",
     day: "2-digit",
