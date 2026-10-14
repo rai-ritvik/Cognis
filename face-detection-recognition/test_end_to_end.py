@@ -5,17 +5,11 @@ import time
 import urllib.error
 import urllib.request
 import cv2
-
-
 API = os.getenv("ML_API_URL", "http://127.0.0.1:8000")
 API_KEY = os.getenv("ML_API_KEY")
-
 STUDENT_ID = "25154115"
 FULL_NAME = "Ambesh Kumar Sharma"
-
 CAMERA_INDEX = 0
-
-
 def frame_to_data_url(frame):
     ok, encoded = cv2.imencode(
         ".jpg",
@@ -124,11 +118,9 @@ def post_json(path, payload):
 
 
 # 1. ENROLLMENT
-
 print("=" * 60)
 print("ENROLLMENT")
 print("=" * 60)
-
 enroll_frames = capture_frames(
     count=5,
     delay=0.6,
@@ -185,9 +177,7 @@ print(
     "\n✅ ENROLLMENT PASSED"
 )
 
-
 # 2. ATTENDANCE
-
 print()
 print("=" * 60)
 print("ATTENDANCE")

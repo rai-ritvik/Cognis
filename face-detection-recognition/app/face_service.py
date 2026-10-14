@@ -45,7 +45,6 @@ except Exception:
 
 
 # CONFIGURATION
-
 @dataclass(frozen=True)
 class ServiceConfig:
     # InsightFace / ArcFace
@@ -88,8 +87,6 @@ class ServiceConfig:
     )
 
     # Image quality
-    # Based on the user's real camera measurements, 0.03 and 25.0 are
-    # practical starting gates. These are NOT identity thresholds.
     min_face_area_ratio: float = float(
         os.getenv("MIN_FACE_AREA_RATIO", "0.03")
     )
@@ -122,9 +119,6 @@ class ServiceConfig:
     blink_reopen_delta: float = float(
         os.getenv("BLINK_REOPEN_DELTA", "0.04")
     )
-
-    # Keep the compressed frame payload bounded, then resize the decoded
-    # image so raw NumPy allocations remain small too.
     max_frame_bytes: int = int(
         os.getenv("MAX_FRAME_BYTES", "262144")
     )
@@ -140,8 +134,6 @@ class ServiceConfig:
         )
     )
 
-    # InsightFace expects <root>/models/<model_name>. The Render build creates
-    # the buffalo_sc files under this root so runtime startup is offline.
     insightface_root: Path = Path(
         os.getenv(
             "INSIGHTFACE_ROOT",
@@ -154,13 +146,9 @@ class ServiceConfig:
         "https://storage.googleapis.com/mediapipe-models/"
         "face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
     )
-
-
 CONFIG = ServiceConfig()
 
-
 # VALIDATION ERROR
-
 class MLValidationError(ValueError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
@@ -169,7 +157,6 @@ class MLValidationError(ValueError):
 
 
 # FACE ML SERVICE
-
 class FaceMLService:
     """Stateless face ML service for enrollment and verification."""
 
@@ -254,9 +241,6 @@ class FaceMLService:
     def _load_models(self) -> None:
         self.config.model_dir.mkdir(parents=True, exist_ok=True)
         self._ensure_insightface_pack()
-
-        # buffalo_sc contains only the detector + recognition models needed by
-        # this service, and allowed_modules prevents accidental extra loading.
         self.face_app = FaceAnalysis(
             name=self.config.model_name,
             root=str(self.config.insightface_root),
@@ -302,7 +286,6 @@ class FaceMLService:
         )
 
     # EMBEDDINGS
-
     @staticmethod
     def normalize_embedding(
         embedding: np.ndarray | list[float],
@@ -804,8 +787,6 @@ class FaceMLService:
         right_s = self.smooth_signal(right.tolist(), 3)
         mean_s = (left_s + right_s) / 2.0
 
-        # Robust open-eye baseline. Use a lower percentile so 1-2 early
-        # blink frames do not raise the baseline enough to hide the blink.
         baseline_count = min(
             max(5, self.config.blink_baseline_frames),
             len(mean_s),
@@ -813,9 +794,6 @@ class FaceMLService:
         baseline_window = mean_s[:baseline_count]
         baseline = float(np.percentile(baseline_window, 40))
 
-        # The previous 0.30 closure floor was above the user's observed
-        # genuine peak (~0.2622). These values retain an explicit 2-frame
-        # closure + 2-frame recovery requirement.
         close_threshold = max(
             self.config.blink_close_floor,
             baseline + self.config.blink_close_delta,
@@ -846,9 +824,6 @@ class FaceMLService:
             self.config.blink_min_reopen_frames,
         )
 
-        # Search from frame 0 instead of starting after the baseline window.
-        # Your previous genuine blink pattern was approximately:
-        # OPEN OPEN OPEN CLOSED CLOSED OPEN OPEN...
         for i in range(len(mean_s)):
             current_left = float(left_s[i])
             current_right = float(right_s[i])
@@ -895,7 +870,6 @@ class FaceMLService:
 
                 continue
 
-            # After closure, require the eyes to return to the open range.
             if both_open:
                 reopen_run += 1
             else:
@@ -1008,8 +982,6 @@ class FaceMLService:
                 f"{self.config.attendance_max_frames} frames",
             )
 
-        # Decode each frame exactly once. Run MediaPipe and InsightFace on the
-        # same image, then release it before the next frame arrives.
         blink_observations: list[dict[str, float | int]] = []
         candidates: list[dict[str, Any]] = []
         rejection_counts: dict[str, int] = {}

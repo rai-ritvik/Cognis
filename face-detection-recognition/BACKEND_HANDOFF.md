@@ -36,7 +36,7 @@ This handoff package intentionally excludes `.venv`, generated face images, cach
 ## Render deployment notes
 
 For the 512 MB Render Free instance, this package defaults to InsightFace `buffalo_sc`, 480px detector input, 640px maximum decoded image dimension, and 15-20 attendance frames. Frames are decoded one at a time and ML requests are serialized in-process.
-
+\
 Render Web Service settings when this directory is the service root:
 
 ```text
@@ -47,6 +47,6 @@ Start: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
 Health Check Path: /
 ```
 
-When deploying the parent `OmniScan` repository as a monorepo service, set the Render Root Directory to `ml-identity` so these commands run inside this directory.
+When deploying the parent `Cognis` repository as a monorepo service, set the Render Root Directory to `ml-identity` so these commands run inside this directory.
 
 Set a secret `ML_API_KEY` in Render and send it as the `X-API-Key` request header from the backend. Do not expose the key in browser JavaScript.

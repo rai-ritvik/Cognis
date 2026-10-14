@@ -1,35 +1,19 @@
 import time
 import cv2
 from app.face_service import FaceMLService, MLValidationError
-
-
 CAMERA_INDEX = 0
 FRAME_COUNT = 5
-
-
-print("=" * 70)
 print("FACE ATTENDANCE CAMERA DIAGNOSTIC")
-print("=" * 70)
-
-
-
 # Load ML service
-
 service = FaceMLService()
-
-
 # Open camera
-
 cap = cv2.VideoCapture(
     CAMERA_INDEX
-)
-
+    )
 if not cap.isOpened():
     raise RuntimeError(
         "Could not open camera."
     )
-
-
 print()
 print("Camera opened.")
 print(
@@ -42,18 +26,11 @@ print(
     "Use good lighting."
 )
 print()
-
-
 time.sleep(2)
-
-
 frames = []
 
-
 # Capture
-
 try:
-
     for i in range(FRAME_COUNT):
 
         ok, frame = cap.read()
@@ -90,16 +67,9 @@ finally:
 
 
 # ML diagnostics
-
 print()
-print("=" * 70)
 print("PER-FRAME ML DIAGNOSTIC")
-print("=" * 70)
-
-
 usable_count = 0
-
-
 for i, frame in enumerate(
     frames,
     start=1
@@ -112,10 +82,6 @@ for i, frame in enumerate(
 
 
     try:
-
-        # IMPORTANT:
-        # The camera already gives us a BGR NumPy image.
-        # We do NOT need to convert it into base64 and decode it again.
 
         embedding, face = (
         service.extract_face_embedding(
@@ -198,9 +164,7 @@ for i, frame in enumerate(
 # Final result
 
 print()
-print("=" * 70)
 print("RESULT")
-print("=" * 70)
 
 print(
     "Captured frames:",
