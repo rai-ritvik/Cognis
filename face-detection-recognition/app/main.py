@@ -7,16 +7,12 @@ import threading
 from pydantic import BaseModel, Field
 from .face_service import FaceMLService, MLValidationError
 
-
 APP_TITLE = "Face Attendance ML API"
 APP_VERSION = os.getenv("ML_API_VERSION", "1.0.0")
 API_KEY = os.getenv("ML_API_KEY")
 MAX_REQUEST_BYTES = int(os.getenv("MAX_REQUEST_BYTES", str(8 * 1024 * 1024)))
 MAX_FRAME_CHARS = int(os.getenv("MAX_FRAME_CHARS", "360000"))
-
 ML_LOCK = threading.Lock()
-
-
 app = FastAPI(
     title=APP_TITLE,
     version=APP_VERSION,
@@ -25,10 +21,7 @@ app = FastAPI(
         "Student records and attendance business logic remain outside this service."
     ),
 )
-
-
 service = FaceMLService()
-
 
 @app.middleware("http")
 async def limit_request_body(request: Request, call_next):
@@ -54,24 +47,16 @@ async def limit_request_body(request: Request, call_next):
 
 
 # REQUEST MODELS
-
 FramePayload = Annotated[str, Field(min_length=16, max_length=MAX_FRAME_CHARS)]
-
-
 class EnrollmentRequest(BaseModel):
     student_id: str = Field(min_length=1, max_length=64)
     full_name: str = Field(min_length=1, max_length=128)
     frames: list[FramePayload] = Field(min_length=3, max_length=8)
-
-
 class VerificationRequest(BaseModel):
     reference_embedding: list[float] = Field(min_length=512, max_length=512)
     frames: list[FramePayload] = Field(min_length=15, max_length=20)
 
-
-
 # HEALTH RESPONSE
-
 class HealthResponse(BaseModel):
     status: str
     model: str
@@ -91,9 +76,7 @@ class HealthResponse(BaseModel):
     # Storage
     storage: str
 
-
 # API KEY
-
 def check_api_key(
     x_api_key: str | None,
 ) -> None:
@@ -113,9 +96,7 @@ def check_api_key(
             },
         )
 
-
 # ROOT
-
 @app.get(
     "/",
     include_in_schema=False,
@@ -128,10 +109,7 @@ def root() -> dict[str, Any]:
         "docs": "/docs",
     }
 
-
-
 # HEALTH
-
 @app.get(
     "/health",
     response_model=HealthResponse,
@@ -144,10 +122,7 @@ def health(
 
     return service.health()
 
-
-
 # ENROLLMENT
-
 @app.post("/enroll")
 def enroll(
     request: EnrollmentRequest,
@@ -193,10 +168,7 @@ def enroll(
             },
         ) from exc
 
-
-
 # VERIFICATION
-
 @app.post("/verify")
 def verify(
     request: VerificationRequest,

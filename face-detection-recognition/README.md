@@ -148,7 +148,3 @@ ATTENDANCE_MAX_FRAMES=20
 ```
 
 Frames are decoded one at a time rather than stored as a list of full-resolution NumPy arrays. ML requests are also serialized inside the FastAPI process so a second inference cannot duplicate the native ONNX/MediaPipe memory footprint. The API also rejects oversized HTTP requests before Pydantic parses large frame payloads.
-
-Keep the client camera around 640x480 JPEG quality 65-75 for the best balance on this small instance.
-
-Render Free services have an ephemeral filesystem and spin down after 15 minutes of inactivity, so do not store student embeddings or attendance data on this service. The backend database remains the source of truth.
