@@ -11,16 +11,12 @@ export default function ResetPassword() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const parameters = new URLSearchParams(window.location.hash.slice(1));
-    const token = parameters.get("access_token");
-    const recoveryType = parameters.get("type");
-    const providerError = parameters.get("error_description");
-    if (providerError) {
-      setError(providerError);
-    } else if (token && recoveryType === "recovery") {
+    const parameters = new URLSearchParams(window.location.search);
+    const token = parameters.get("reset_token");
+    if (token) {
       setAccessToken(token);
     } else {
-      setError("This password reset link is invalid or has expired. Request a new link.");
+      setError("This password reset token is invalid or has expired. Request a new code.");
     }
   }, []);
 

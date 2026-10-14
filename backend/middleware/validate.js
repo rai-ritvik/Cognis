@@ -1,14 +1,22 @@
-// validate(schema, 'body' | 'params' | 'query') -> checks input with zod and stores the clean result in req.valid[source]
-const validate = (schema, source = 'body') => (req, res, next) => {
-  const result = schema.safeParse(req[source]);
-  if (!result.success) {
-    return res.status(400).json({
-      error: 'Validation failed',
-      details: result.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })),
-    });
-  }
-  req.valid = req.valid || {};
-  req.valid[source] = result.data;
-  next();
-};
+﻿const AppError = require('../utils/AppError');
+
+function validate(schema, target = 'body') {
+  return (req, res, next) => {
+    const result = schema.safeParse(target === 'params' ? req.params : req.body);
+
+    if (!result.success) {
+      const err = new AppError(400, 'Validation failed', 'VALIDATION_ERROR');
+      err.details = result.error.issues.map(issue => ({
+        field: issue.path.join('.'),
+        message: issue.message
+      }));
+      return next(err);
+    }
+
+    req.valid ||= {};
+    req.valid[target] = result.data;
+    next();
+  };
+}
+
 module.exports = validate;

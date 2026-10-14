@@ -76,7 +76,7 @@ export default function AdminDashboard() {
     try {
       const result = await getAdminActiveAttendanceSession();
       setActiveSession(result.session);
-      setRoomToken(result.session?.current_room_token || "");
+      setRoomToken(result.session?.current_room_token || result.session?.room_token || "");
       if (result.session) {
         const attendance = await getSessionAttendance(result.session.id);
         setAttendees(attendance.students || []);
@@ -455,7 +455,7 @@ export default function AdminDashboard() {
                   <div className="admin-attendee-row" key={`${attendee.roll_number}-${attendee.time_logged || index}`}>
                     <span className="admin-attendee-avatar">{(attendee.roll_number || "?").slice(0, 1).toUpperCase()}</span>
                     <span className="admin-attendee-id">{attendee.roll_number || "Student"}</span>
-                    <span className="admin-present-badge"><FiCheckCircle aria-hidden="true" /> Present</span>
+                    <span className={`admin-present-badge ${attendee.status === "PENDING_REVIEW" ? "pending" : ""}`}><FiCheckCircle aria-hidden="true" /> {attendee.status === "PENDING_REVIEW" ? "Pending review" : attendee.status === "REJECTED" ? "Rejected" : "Present"}</span>
                   </div>
                 ))}
               </div>

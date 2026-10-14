@@ -1,6 +1,6 @@
 const SESSION_KEY = "sa_session";
 const DEMO_SESSION_KEY = "netra_demo_active_session";
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/+$/, "");
 const DEMO_ADMIN_ENABLED = false;
 const DEMO_ADMIN_EMAIL = "admin@cognis.test";
 const DEMO_ADMIN_PASSWORD = "cognis-demo";
@@ -49,16 +49,22 @@ export async function loginWithGoogle() {
   throw new Error("Google sign-in is not available yet. Please use your student number and password.");
 }
 
-export const requestPasswordReset = (identifier) =>
+export const requestPasswordReset = (rollNumber) =>
   requestApi("/api/auth/forgot", {
     method: "POST",
-    body: { identifier },
+    body: { roll_number: String(rollNumber).trim() },
+  });
+
+export const verifyPasswordResetCode = (rollNumber, code) =>
+  requestApi("/api/auth/verify-otp", {
+    method: "POST",
+    body: { roll_number: String(rollNumber).trim(), code: String(code).trim() },
   });
 
 export const completePasswordReset = (accessToken, password) =>
   requestApi("/api/auth/reset-password", {
     method: "POST",
-    body: { token: accessToken, password },
+    body: { reset_token: accessToken, new_password: password },
   });
 
 async function requestApi(path, { method = "GET", body, token } = {}) {
@@ -88,7 +94,7 @@ async function requestApi(path, { method = "GET", body, token } = {}) {
     const session = getSession();
     if (session?.token === token) localStorage.removeItem(SESSION_KEY);
   }
-  if (!response.ok) throw new Error(result.error || "The request could not be completed.");
+  if (!response.ok) throw new Error(result.error || result.message || "The request could not be completed.");
   return result;
 }
 
@@ -130,8 +136,11 @@ const getDemoActiveSession = () => {
 
 const isDemoAdmin = () => DEMO_ADMIN_ENABLED && getSession()?.demo === true;
 
-export const getActiveAttendanceSession = () =>
-  DEMO_ADMIN_ENABLED ? Promise.resolve(getDemoActiveSession()) : requestApi("/api/sessions/active");
+export const getActiveAttendanceSession = async () => {
+  if (DEMO_ADMIN_ENABLED) return getDemoActiveSession();
+  const result = await requestApi("/api/sessions/active", { token: getSession()?.token });
+  return { active: Boolean(result.session), session: result.session || null };
+};
 
 export const checkInForAttendance = (details) =>
   requestApi("/api/attendance/checkin", {
@@ -148,8 +157,58 @@ const requestStudentApi = (path, options = {}) => {
   return requestApi(path, { ...options, token: session.token });
 };
 
-export const getMyHome = () => requestStudentApi("/api/me/home");
-export const getMyAnalytics = () => requestStudentApi("/api/me/analytics");
+const toUiAttendance = (record) => ({
+  id: record.session_id || record.id,
+  session_id: record.session_id || record.id,
+  event: record.title || record.event || "Attendance session",
+  date: String(record.starts_at || record.date || "").slice(0, 10),
+  status: record.status === "Present" || record.status === "PRESENT"
+    ? "Present"
+    : record.status === "Pending" || record.status === "PENDING_REVIEW"
+      ? "Pending"
+      : record.status === "Not marked"
+        ? "Not marked"
+        : "Absent",
+});
+
+export const getMyHome = async () => {
+  const [home, analytics] = await Promise.all([
+    requestStudentApi("/api/me/home"),
+    requestStudentApi("/api/me/analytics"),
+  ]);
+  const attendance = (analytics.records || []).map(toUiAttendance);
+  const overall = analytics.overall || home.overall || {};
+  const today = home.today || {};
+  return {
+    ...home,
+    attendance,
+    events: (home.upcoming_events?.items || []).map((event) => ({
+      ...event,
+      date: event.event_date || event.date || "",
+    })),
+    summary: {
+      attendedClasses: overall.present || 0,
+      totalClasses: overall.total || 0,
+      presentToday: today.present || 0,
+      totalToday: today.total || 0,
+      friendsCount: 0,
+    },
+  };
+};
+
+export const getMyAnalytics = async () => {
+  const result = await requestStudentApi("/api/me/analytics");
+  const allRecords = (result.records || []).map(toUiAttendance);
+  const attendance = allRecords.filter((record) => ["Present", "Absent"].includes(record.status));
+  return {
+    ...result,
+    attendance,
+    summary: {
+      attendedClasses: result.overall?.present || 0,
+      totalClasses: (result.overall?.present || 0) + (result.overall?.absent || 0),
+    },
+  };
+};
 
 const normalizeProfileResponse = (result) => {
   const member = result?.profile || result?.member;
@@ -172,7 +231,7 @@ const normalizeProfileResponse = (result) => {
       skills: Array.isArray(member.skills)
         ? member.skills.join(", ")
         : member.skills || "",
-      photo: member.photo || member.profile_photo_url || "",
+      photo: member.photo || member.profile_photo_url || member.profile_photo_base64 || "",
     },
   };
 };
@@ -183,7 +242,18 @@ export const getMyProfile = () =>
 export const updateMyProfile = (profile) =>
   requestStudentApi("/api/me/profile", {
     method: "PATCH",
-    body: profile,
+    body: {
+      ...(profile.about !== undefined ? { bio: profile.about } : {}),
+      ...(profile.profile_photo_base64 !== undefined ? { profile_photo_base64: profile.profile_photo_base64 } : {}),
+      ...(profile.bio !== undefined ? { bio: profile.bio } : {}),
+      ...(profile.skills !== undefined ? {
+        skills: (Array.isArray(profile.skills) ? profile.skills : String(profile.skills).split(","))
+          .map((skill) => String(skill).trim()).filter(Boolean),
+      } : {}),
+      ...((profile.github_handle ?? profile.github) ? { github_handle: profile.github_handle ?? profile.github } : {}),
+      ...((profile.linkedin_url ?? profile.linkedin) ? { linkedin_url: profile.linkedin_url ?? profile.linkedin } : {}),
+      ...((profile.instagram_url ?? profile.instagram) ? { instagram_url: profile.instagram_url ?? profile.instagram } : {}),
+    },
   }).then(normalizeProfileResponse);
 
 export const getMyFriends = () => requestStudentApi("/api/me/friends");
@@ -204,7 +274,10 @@ export const getAdminActiveAttendanceSession = () => {
     throw new Error("Sign in with an administrator account to manage attendance.");
   }
   if (isDemoAdmin()) return Promise.resolve(getDemoActiveSession());
-  return requestApi("/api/sessions/active/admin", { token: session.token });
+  return requestApi("/api/sessions/active", { token: session.token }).then((result) => ({
+    active: Boolean(result.session),
+    session: result.session ? { ...result.session, current_room_token: result.session.room_token } : null,
+  }));
 };
 
 export const getAdminMembers = () => {
@@ -234,34 +307,51 @@ const requestAdminApi = (path, options = {}) => {
   return requestApi(path, { ...options, token: session.token });
 };
 
-export const getAdminReviews = () => requestAdminApi("/api/admin/reviews");
-export const reviewAttendance = (attendanceId, decision, reason = "") =>
-  requestAdminApi(`/api/admin/alerts/${encodeURIComponent(attendanceId)}/review`, {
-    method: "PATCH",
-    body: { decision, reason },
+export const getAdminReviews = () => requestAdminApi("/api/admin/alerts").then((result) => ({ reviews: (result.alerts || []).map((alert) => ({ ...alert, member: alert.members, student: alert.members, session: alert.sessions, reason: alert.reason })) }));
+export const reviewAttendance = (alertId, decision, reason = "") =>
+  requestAdminApi(`/api/admin/alerts/${encodeURIComponent(alertId)}/review`, {
+    method: "POST",
+    body: { decision: ["approve", "approved"].includes(String(decision).toLowerCase()) ? "approve" : "reject" },
   });
-export const getAdminFlags = () => requestAdminApi("/api/admin/flags");
-export const setAttendanceFlag = (attendanceId, flagged, reason = "") =>
-  requestAdminApi(`/api/admin/flags/${encodeURIComponent(attendanceId)}`, {
-    method: "PATCH",
-    body: { flagged, reason },
+export const getAdminFlags = () => requestAdminApi("/api/admin/flags").then((result) => ({ flags: (result.flags || []).map((flag) => ({ ...flag, member: flag.members, student: flag.members, flag_reason: flag.reason })) }));
+export const setAttendanceFlag = (memberId, flagged, reason = "") =>
+  requestAdminApi(`/api/admin/members/${encodeURIComponent(memberId)}/${flagged ? "flag" : "unflag"}`, {
+    method: "POST",
+    ...(flagged ? { body: { reason: reason || "Flagged for administrator review" } } : {}),
   });
-export const getAdminAnalytics = () => requestAdminApi("/api/admin/analytics");
-export const getAdminEvents = () => requestAdminApi("/api/admin/events");
+export const getAdminAnalytics = () => requestAdminApi("/api/admin/analytics").then((result) => ({
+  ...result,
+  members: result.total_members ?? result.members ?? 0,
+  sessions: result.total_sessions ?? result.sessions ?? 0,
+  present: result.present_checkins ?? result.present ?? 0,
+  pending_reviews: result.pending_reviews ?? 0,
+  flagged: result.flagged ?? 0,
+}));
+export const getAdminEvents = () => requestAdminApi("/api/admin/events").then((result) => ({
+  events: (result.events || []).map((event) => ({
+    ...event,
+    starts_at: event.starts_at || (event.event_date ? `${event.event_date}T00:00:00` : null),
+    status: event.status || "PUBLISHED",
+  })),
+}));
 export const createAdminEvent = (event) =>
-  requestAdminApi("/api/admin/events", { method: "POST", body: event });
-export const cancelAdminEvent = (eventId) =>
-  requestAdminApi(`/api/admin/events/${encodeURIComponent(eventId)}`, {
-    method: "PATCH",
-    body: { status: "CANCELLED" },
+  requestAdminApi("/api/admin/events", {
+    method: "POST",
+    body: {
+      title: event.title,
+      description: event.description,
+      event_date: String(event.event_date || event.starts_at || "").slice(0, 10),
+    },
   });
-export const getAdminSchedules = () => requestAdminApi("/api/admin/schedules");
+export const cancelAdminEvent = (eventId) =>
+  requestAdminApi(`/api/admin/events/${encodeURIComponent(eventId)}`, { method: "DELETE" });
+export const getAdminSchedules = () => requestAdminApi("/api/sessions").then((result) => ({ schedules: (result.sessions || []).map((session) => ({ ...session, scheduled_at: session.starts_at, status: session.status === "SCHEDULED" ? "PENDING" : session.status })) }));
 export const createAdminSchedule = (schedule) =>
-  requestAdminApi("/api/admin/schedules", { method: "POST", body: schedule });
+  requestAdminApi("/api/sessions/schedule", { method: "POST", body: { title: schedule.title, starts_at: schedule.starts_at || schedule.scheduled_at, latitude: schedule.latitude, longitude: schedule.longitude, radius_m: schedule.radius_m } }).then((result) => ({ schedule: { ...result.session, scheduled_at: result.session?.starts_at, status: result.session?.status === "SCHEDULED" ? "PENDING" : result.session?.status } }));
 export const cancelAdminSchedule = (scheduleId) =>
-  requestAdminApi(`/api/admin/schedules/${encodeURIComponent(scheduleId)}`, {
-    method: "PATCH",
-    body: { status: "CANCELLED" },
+  requestAdminApi("/api/sessions/end", {
+    method: "POST",
+    body: { session_id: scheduleId },
   });
 
 export const startAttendanceSession = ({ title, latitude, longitude }) => {
@@ -290,7 +380,7 @@ export const startAttendanceSession = ({ title, latitude, longitude }) => {
     method: "POST",
     body: { title, latitude, longitude },
     token: session.token,
-  });
+  }).then((result) => ({ ...result, current_room_token: result.room_token }));
 };
 
 export const endAttendanceSession = (sessionId) => {
@@ -326,7 +416,7 @@ export const rotateAttendanceRoomToken = (sessionId) => {
     method: "POST",
     body: { session_id: sessionId },
     token: session.token,
-  });
+  }).then((result) => ({ ...result, new_room_token: result.room_token }));
 };
 
 export const getSessionAttendance = (sessionId) => {
@@ -344,7 +434,7 @@ export const getSessionAttendance = (sessionId) => {
       students: DEMO_ATTENDEES,
     });
   }
-  return requestApi(`/api/sessions/attendance/${encodeURIComponent(sessionId)}`, {
+  return requestApi(`/api/sessions/${encodeURIComponent(sessionId)}/attendance`, {
     token: session.token,
   });
 };

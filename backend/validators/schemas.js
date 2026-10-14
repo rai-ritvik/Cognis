@@ -56,11 +56,15 @@ const s = {
 
   updateProfile: z.object({
     bio: optionalText(500),
+    profile_photo_base64: z.string().max(700_000).regex(/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/, 'Profile photo must be a supported base64 image').optional(),
     skills: z.array(z.string().trim().min(1).max(30)).max(10).optional(),
     github_handle: githubHandle.optional(),
     linkedin_url: z.string().trim().url().max(200).optional(),
     instagram_url: z.string().trim().url().max(200).optional(),
   }),
+  friendRequest: z.object({ roll_number: roll }),
+  friendRequestStatus: z.object({ status: z.enum(['ACCEPTED', 'REJECTED']) }),
+
   project: z.object({
     title: z.string().trim().min(2).max(120),
     repo_url: z.string().trim().url().max(300),

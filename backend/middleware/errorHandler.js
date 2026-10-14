@@ -1,16 +1,22 @@
-const AppError = require('../utils/AppError');
+﻿const AppError = require('../utils/AppError');
 
-const notFound = (req, res) => res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
+function notFound(req, res, next) {
+  next(new AppError(404, `Route not found: ${req.method} ${req.originalUrl}`));
+}
 
-// eslint-disable-next-line no-unused-vars
-const errorHandler = (err, req, res, next) => {
-  if (err instanceof AppError) {
-    return res.status(err.status).json({ error: err.message, code: err.code });
-  }
-  if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Image/request is too large' });
-  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON body' });
-  console.error('[unhandled]', err);
-  return res.status(500).json({ error: 'Internal Server Error' });
-};
+function errorHandler(err, req, res, next) {
+  if (res.headersSent) return next(err);
+
+  const status = Number.isInteger(err.status) ? err.status : 500;
+  const message = status >= 500 && process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : (err.message || 'Internal server error');
+
+  const body = { error: message };
+  if (err.code) body.code = err.code;
+  if (err.details) body.details = err.details;
+
+  res.status(status).json(body);
+}
 
 module.exports = { notFound, errorHandler };

@@ -124,15 +124,32 @@ const analytics = async (req, res) => {
   const domainTurnout = Object.values(byDomain).map((d) => ({ domain: d.domain, members: d.members, average_percent: Math.round((d.sum / d.members) * 10) / 10 }));
   const avg = perMember.length ? Math.round((perMember.reduce((a, m) => a + m.percent, 0) / perMember.length) * 10) / 10 : 0;
 
+  const pendingReviews = att.filter((row) => row.status === 'PENDING_REVIEW').length;
+  const presentCheckins = att.filter((row) => row.status === 'PRESENT').length;
+  const flags = unwrap(await supabase.from('flags').select('id').eq('active', true), 'Could not load flags');
+
   res.json({
     average_attendance_percent: avg,
+    total_members: members.length,
     total_sessions: sessions.length,
+    present_checkins: presentCheckins,
+    pending_reviews: pendingReviews,
+    flagged: flags.length,
     domain_turnout: domainTurnout,
     at_risk: perMember.filter((m) => m.total > 0 && m.percent < 50).sort((a, b) => a.percent - b.percent),
   });
 };
 
 // Events
+const listEvents = async (req, res) => {
+  const data = unwrap(
+    await supabase.from('events').select('id, title, description, event_date, created_at')
+      .order('event_date', { ascending: true }).limit(100),
+    'Could not load events'
+  );
+  res.json({ events: data });
+};
+
 const createEvent = async (req, res) => {
   const b = req.valid.body;
   const e = unwrap(await supabase.from('events').insert([{ title: b.title, description: b.description || null, event_date: b.event_date, created_by: req.user.id }]).select('id, title, description, event_date').single(), 'Could not create event');
@@ -149,11 +166,12 @@ const listAlerts = async (req, res) => {
   const reviewed = req.query.reviewed === 'true';
   const data = unwrap(
     await supabase.from('spoof_alerts')
-      .select('id, reason, match_score, details, reviewed, attendance_id, created_at, members(roll_number, full_name), sessions(title)')
-      .eq('reviewed', reviewed).order('created_at', { ascending: false }).limit(100),
+      .select('id, reason, match_score, details, reviewed, attendance_id, created_at, members(id, roll_number, full_name), sessions(title)')
+      .eq('reviewed', reviewed)
+       .order('created_at', { ascending: false }).limit(100),
     'Could not load alerts'
   );
-  res.json({ alerts: data });
+  res.json({ alerts: reviewed ? data : data.filter((alert) => alert.attendance_id) });
 };
 const getAlert = async (req, res) => {
   const a = unwrap(await supabase.from('spoof_alerts').select('id, reason, match_score, details, reviewed, attendance_id, created_at, image_base64, members(roll_number, full_name)').eq('id', req.valid.params.id).maybeSingle(), 'Could not load alert');
@@ -180,6 +198,6 @@ const listProjects = async (req, res) => {
 
 module.exports = {
   dashboard, listMembers, removeMember: setRemoved(true), restoreMember: setRemoved(false),
-  flagMember, unflagMember, listFlags, analytics, createEvent, deleteEvent,
+  flagMember, unflagMember, listFlags, analytics, listEvents, createEvent, deleteEvent,
   listAlerts, getAlert, reviewAlert, listProjects,
 };

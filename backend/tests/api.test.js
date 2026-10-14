@@ -104,6 +104,7 @@ test('register fails closed when ML1 is down (no fallback)', async () => {
 
 test('registration requires 3-8 frames and attendance requires 15-20 frames', async () => {
   const badRegister = await api('POST', '/api/auth/register', { body: { ...registerBody('2500271530298', 'frames@x.com'), frames: [IMG] } });
+  console.log('BAD REGISTER RESPONSE:', badRegister.status, badRegister.json);
   assert.equal(badRegister.status, 400);
   const noToken = await api('POST', '/api/attendance/checkin', { body: { session_id: '00000000-0000-4000-8000-000000000001', room_token: '1234', latitude: 28.6139, longitude: 77.2090, frames: [IMG] } });
   assert.equal(noToken.status, 401);

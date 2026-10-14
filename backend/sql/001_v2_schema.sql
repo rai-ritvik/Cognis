@@ -1,10 +1,12 @@
 -- =====================================================================
--- OmniScan v2 schema upgrade  (run ONCE in Supabase -> SQL Editor)
--- Safe to re-run: every statement is "if not exists" / "drop if exists".
+-- DESTRUCTIVE LEGACY SCHEMA UPGRADE.
+-- DO NOT run this script against a populated/production database.
+-- STEP A contains DELETE statements that erase rows from multiple tables.
+-- Back up and inspect the database before considering this legacy script.
 -- =====================================================================
 
--- STEP A: wipe old TEST data (dummy embeddings, 7-digit roll numbers, old sessions).
--- Order matters because of foreign keys.
+-- STEP A: DESTRUCTIVE DATA WIPE (members, sessions, attendance, projects, alerts).
+-- These deletes are not safe to repeat against real data; order matters for FKs.
 delete from spoof_alerts;
 delete from attendance;
 delete from attendance_logs;

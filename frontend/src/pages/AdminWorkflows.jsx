@@ -80,7 +80,7 @@ function ReviewQueuePage() {
     setError("");
     setNotice("");
     try {
-      const result = await setAttendanceFlag(review.id, true, reason);
+      const result = await setAttendanceFlag(review.student?.id, true, reason);
       setNotice(result.message);
       await refresh();
     } catch (actionError) {
@@ -134,7 +134,7 @@ function FlagsPage() {
     setBusyId(record.id);
     setError("");
     try {
-      const result = await setAttendanceFlag(record.id, false);
+      const result = await setAttendanceFlag(record.student?.id, false);
       setNotice(result.message);
       await refresh();
     } catch (actionError) {
@@ -205,8 +205,7 @@ function EventsPage() {
       const result = await createAdminEvent({
         title: form.title,
         description: form.description,
-        starts_at: new Date(form.startsAt).toISOString(),
-        ends_at: form.endsAt ? new Date(form.endsAt).toISOString() : null,
+        event_date: new Date(form.startsAt).toISOString().slice(0, 10),
       });
       setNotice(`Created ${result.event.title}.`);
       setForm({ title: "", description: "", startsAt: "", endsAt: "" });
@@ -267,7 +266,7 @@ function SchedulePage() {
         latitude: Number(form.latitude),
         longitude: Number(form.longitude),
       });
-      setNotice(`Scheduled ${result.schedule.title}. It will open automatically when its start time arrives.`);
+      setNotice(`Scheduled ${result.schedule.title}. It is saved as scheduled; an administrator must open it when it is time.`);
       setForm({ title: "", scheduledAt: "", latitude: "", longitude: "" });
       await refresh();
     } catch (actionError) {
@@ -290,7 +289,7 @@ function SchedulePage() {
     }
   };
   return (
-    <WorkflowPage eyebrow="ATTENDANCE MANAGEMENT" title="Schedule session" description="Set a future start time and class location. Scheduled sessions open automatically when no other session is active." error={error} notice={notice}>
+    <WorkflowPage eyebrow="ATTENDANCE MANAGEMENT" title="Schedule session" description="Set a future start time and class location. An administrator must open the session manually when it is time." error={error} notice={notice}>
       <form className="admin-workflow-form admin-schedule-form" onSubmit={submit}>
         <label>Session title<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} maxLength={120} required /></label>
         <label>Starts at<input type="datetime-local" value={form.scheduledAt} onChange={(event) => setForm({ ...form, scheduledAt: event.target.value })} required /></label>

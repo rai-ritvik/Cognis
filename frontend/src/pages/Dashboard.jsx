@@ -100,7 +100,9 @@ export default function Dashboard() {
         date,
         status: records.every((record) => record.status === "Present")
           ? "Present"
-          : "Absent",
+          : records.some((record) => record.status === "Pending")
+            ? "Pending"
+            : "Absent",
       }))
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [attendance]);

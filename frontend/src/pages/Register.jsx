@@ -81,7 +81,7 @@ export default function Register() {
   const onSubmit = async (event) => {
     event.preventDefault();
     setError("");
-    if (!/^\d{13}$/.test(form.studentId.trim()))
+    if (!/^\d{8,13}$/.test(form.studentId.trim()))
       return setError("Student number must contain exactly 13 digits.");
     if (form.password.length < 8)
       return setError("Password must be at least 8 characters.");
@@ -142,10 +142,10 @@ export default function Register() {
           name="studentId"
           autoComplete="username"
           inputMode="numeric"
-          pattern="[0-9]{13}"
+          pattern="[0-9]{8,13}"
           maxLength={13}
           title="Student number must contain exactly 13 digits"
-          placeholder="Enter your 13-digit student number"
+          placeholder="Enter 8 to 13 digit student number"
           required
           value={form.studentId}
           onChange={onChange}

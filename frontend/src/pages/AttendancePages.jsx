@@ -200,7 +200,7 @@ export function MarkAttendancePage() {
       return;
     }
 
-    const frameCount = 24;
+    const frameCount = 20;
     const promptFrame = Math.floor(Math.random() * 6) + 8;
     const frames = [];
     captureCancelledRef.current = false;
@@ -222,7 +222,7 @@ export function MarkAttendancePage() {
 
         const scale = Math.min(
           1,
-          320 / Math.max(video.videoWidth, video.videoHeight),
+          640 / Math.max(video.videoWidth, video.videoHeight),
         );
         const canvas = document.createElement("canvas");
         canvas.width = Math.round(video.videoWidth * scale);
@@ -259,7 +259,7 @@ export function MarkAttendancePage() {
       );
       return;
     }
-    if (capturedFrames.length < 20) {
+    if (capturedFrames.length !== 20) {
       setCheckInState("error");
       setCheckInMessage(
         "Capture the prompted 20-frame liveness scan before submitting attendance.",
@@ -286,7 +286,6 @@ export function MarkAttendancePage() {
         );
       });
       const result = await checkInForAttendance({
-        roll_number: user.studentId,
         session_id: activeSession.id,
         room_token: roomToken.trim(),
         latitude: position.coords.latitude,
@@ -294,14 +293,10 @@ export function MarkAttendancePage() {
         frames: capturedFrames,
         blink_prompt_frame_index: blinkPromptFrameIndex,
       });
-      if (result.status !== "PRESENT") {
-        throw new Error(
-          "The server did not confirm a present attendance record.",
-        );
+      if (!["PRESENT", "PENDING_REVIEW"].includes(result.status)) {
+        throw new Error("The server returned an unexpected attendance status.");
       }
-      setCheckInState(
-        result.review_status === "PENDING" ? "pending" : "success",
-      );
+      setCheckInState(result.status === "PENDING_REVIEW" ? "pending" : "success");
       setCheckInMessage(result.message || "Attendance marked successfully.");
     } catch (error) {
       setCheckInState("error");
@@ -389,7 +384,7 @@ export function MarkAttendancePage() {
               aria-live="polite"
             >
               {cameraState === "capturing"
-                ? `${blinkPrompt || "Keep your face in the frame"} — ${captureProgress}/24 frames`
+                ? `${blinkPrompt || "Keep your face in the frame"} — ${captureProgress}/20 frames`
                 : `24 frames captured. Followed the blink prompt at frame ${blinkPromptFrameIndex + 1}.`}
             </p>
           )}
@@ -710,11 +705,11 @@ export function FriendsPage() {
           <input
             id="friend-student-number"
             inputMode="numeric"
-            pattern="[0-9]{13}"
+            pattern="[0-9]{8,13}"
             maxLength={13}
             value={studentId}
             onChange={(event) => setStudentId(event.target.value)}
-            placeholder="Enter 13-digit student number"
+            placeholder="Enter 8 to 13 digit student number"
             required
           />
           <button className="profile-edit-button" type="submit" disabled={busy}>

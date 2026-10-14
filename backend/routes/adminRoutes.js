@@ -8,6 +8,7 @@ router.use(verifyToken, requireAdmin);
 
 router.get('/dashboard', c.dashboard);
 router.get('/analytics', c.analytics);
+router.get('/events', c.listEvents);
 router.get('/members', c.listMembers);
 router.post('/members/:id/remove', validate(s.idParam, 'params'), c.removeMember);
 router.post('/members/:id/restore', validate(s.idParam, 'params'), c.restoreMember);
