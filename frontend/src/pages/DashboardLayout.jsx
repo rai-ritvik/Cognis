@@ -54,7 +54,7 @@ export default function DashboardLayout() {
     <div className={`dash${isMarkAttendanceRoute ? " mark-attendance-route" : ""}`}>
       <aside className="dash-sidebar">
         <NavLink className="dash-logo" to="/dashboard" aria-label="Cognis home">
-          <img className="dash-logo-image" src="/cognis-wordmark.png" alt="Cognis" />
+          <img className="dash-logo-image" src="/Cognis.png" alt="Cognis" />
         </NavLink>
 
         <nav className="dash-nav" aria-label="Dashboard navigation">
