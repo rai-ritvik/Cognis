@@ -1,3 +1,4 @@
+import react from "react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   BrowserRouter,
