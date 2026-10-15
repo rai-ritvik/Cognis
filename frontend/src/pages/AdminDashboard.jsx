@@ -242,7 +242,7 @@ export default function AdminDashboard() {
     <div className="admin-shell">
       <aside className="admin-sidebar">
         <a className="admin-logo" href="/admin" aria-label="Cognis admin home">
-          <img src="/cognis-wordmark.png" alt="Cognis" />
+          <img src="/Cognis.png" alt="Cognis" />
         </a>
         <div className="admin-side-label">ADMINISTRATION</div>
         <NavLink aria-label="Portal control" className={({ isActive }) => `admin-nav-item${isActive ? " active" : ""}`} to="/admin" end>
